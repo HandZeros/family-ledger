@@ -1,0 +1,14 @@
+services:
+  family-ledger:
+    build: .
+    image: family-ledger:1.0
+    container_name: family-ledger
+    restart: unless-stopped
+    ports:
+      # 左边是宿主机端口，如果 5257 被占用可改成 8080:5257
+      - "5257:5257"
+    volumes:
+      # 账本数据（SQLite）持久化在宿主机的 ./data 目录，删除容器也不会丢
+      - ./data:/data
+    environment:
+      - TZ=Asia/Shanghai

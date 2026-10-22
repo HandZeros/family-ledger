@@ -1,0 +1,17 @@
+{
+  "name": "family-ledger-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "家庭账本 Android 壳（Capacitor）",
+  "scripts": {
+    "sync": "cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3"
+  }
+}

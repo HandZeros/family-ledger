@@ -1,0 +1,37 @@
+# 运行数据与本地配置（绝不提交）
+data/
+.env
+*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Android 构建产物
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/.idea/
+mobile/android/capacitor-cordova-android-plugins/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# AI 工作记忆（本地，不参与发布）
+.workbuddy/
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 测试临时目录
+.testdata*/
+.smoke/

@@ -1,0 +1,13 @@
+{
+  "appId": "com.handzeros.familyledger",
+  "appName": "家庭账本",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#F5F3EE"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

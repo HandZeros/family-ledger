@@ -1,0 +1,27 @@
+# 家庭账本 · Caddy 反向代理
+# 自动申请并续期 Let's Encrypt 证书，无需手写 SSL 配置。
+#
+# 使用前提：
+#   1. 有公网 IP，且路由器把 80、443 端口映射到本机
+#   2. 域名 A 记录指向你的公网 IP
+#
+# 启动：docker compose -f docker-compose.yml -f deploy/docker-compose.caddy.yml up -d
+# 域名通过环境变量 DOMAIN 注入（可写在 .env 中）
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header -Server
+
+	# 容器间直连，走 compose 内部网络
+	reverse_proxy family-ledger:5257 {
+		# 保留真实客户端 IP，后端的登录限流才能按 IP 生效
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

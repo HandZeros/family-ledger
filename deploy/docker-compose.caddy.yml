@@ -1,0 +1,28 @@
+# 方案 A：有公网 IP + 域名 —— Caddy 自动 HTTPS
+#
+#   cp .env.example .env    # 填 DOMAIN
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.caddy.yml up -d
+#
+# 访问 https://你的域名
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: family-ledger-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      - DOMAIN=${DOMAIN:?请先在 .env 中设置 DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - family-ledger
+
+volumes:
+  caddy_data:
+  caddy_config:
