@@ -363,3 +363,34 @@ iOS Safari：分享 → 添加到主屏幕；Android Chrome：菜单 → 添加�
 - **权限**：服务端逐接口校验，前端仅做界面隐藏；越权请求返回 403
 
 接口文档（运行中可访问）：`http://服务器IP:5257/api/docs`
+
+---
+
+## 附：发布到 GitHub
+
+仓库已经初始化好（分支 `main`，含首次提交），只差推到远端。
+
+**方式一：用脚本（推荐）**
+
+```bash
+bash scripts/publish-github.sh
+```
+
+按提示粘贴一次 PAT，脚本会自动创建仓库、推送并配好 `origin`。token 只在本次 `git push` 中使用，不会写进 `.git/config`。
+
+**方式二：手动**
+
+1. 打开 <https://github.com/new>，仓库名填 `family-ledger`，**不要**勾选 README / .gitignore（保持空仓库）
+2. 然后执行：
+
+```bash
+git remote add origin https://github.com/HandZeros/family-ledger.git
+git push -u origin main
+```
+
+> GitHub 从 2021 年起就不支持用账号密码推送了，必须用 PAT（个人访问令牌）。
+> 生成地址：<https://github.com/settings/tokens> —— 经典 token 勾选 `repo` 即可。
+
+推上去之后：
+- **Actions → Build Android APK** 可手动触发构建，产物在 Artifacts 里
+- 打 tag 会自动创建 Release 并附上 APK：`git tag v1.0.0 && git push origin v1.0.0`
