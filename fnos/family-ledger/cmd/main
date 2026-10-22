@@ -1,0 +1,83 @@
+#!/bin/bash
+# 家庭账本 —— 启动 / 停止 / 状态检查
+
+APP_DIR="${TRIM_APPDEST}/server"
+PKGVAR="${TRIM_PKGVAR}"
+VENV="${PKGVAR}/venv"
+PID_FILE="${PKGVAR}/app.pid"
+LOG_FILE="${PKGVAR}/info.log"
+DATA_DIR="${PKGVAR}/data"
+
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"; }
+
+# 端口优先级：settings.conf 中的 PORT > 系统注入的 TRIM_SERVICE_PORT > 5257
+resolve_port() {
+    if [ -f "${TRIM_PKGETC}/settings.conf" ]; then
+        # shellcheck disable=SC1090
+        . "${TRIM_PKGETC}/settings.conf"
+    fi
+    PORT="${PORT:-${TRIM_SERVICE_PORT:-5257}}"
+}
+
+is_running() {
+    if [ -f "${PID_FILE}" ]; then
+        pid=$(head -n 1 "${PID_FILE}" | tr -d '[:space:]')
+        if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+            return 0
+        fi
+        rm -f "${PID_FILE}"
+    fi
+    return 1
+}
+
+start_app() {
+    is_running && return 0
+    resolve_port
+    mkdir -p "${DATA_DIR}" "${PKGVAR}"
+
+    if [ ! -x "${VENV}/bin/python" ]; then
+        echo "Python 运行环境不存在，请卸载后重新安装「家庭账本」。" > "${TRIM_TEMP_LOGFILE}"
+        return 1
+    fi
+
+    cd "${APP_DIR}" || return 1
+    log "starting on 0.0.0.0:${PORT}, data=${DATA_DIR}"
+
+    DATA_DIR="${DATA_DIR}" nohup "${VENV}/bin/python" -m uvicorn app.main:app \
+        --host 0.0.0.0 --port "${PORT}" \
+        --proxy-headers --forwarded-allow-ips=127.0.0.1 \
+        >> "${LOG_FILE}" 2>&1 &
+
+    echo $! > "${PID_FILE}"
+    sleep 2
+
+    if is_running; then
+        return 0
+    fi
+    echo "应用启动失败，请检查日志：${LOG_FILE}" > "${TRIM_TEMP_LOGFILE}"
+    return 1
+}
+
+stop_app() {
+    is_running || return 0
+    pid=$(head -n 1 "${PID_FILE}" | tr -d '[:space:]')
+    log "stopping pid ${pid}"
+    kill -TERM "${pid}" 2>/dev/null
+    count=0
+    while kill -0 "${pid}" 2>/dev/null && [ ${count} -lt 15 ]; do
+        sleep 1
+        count=$((count + 1))
+    done
+    if kill -0 "${pid}" 2>/dev/null; then
+        kill -KILL "${pid}" 2>/dev/null
+    fi
+    rm -f "${PID_FILE}"
+    return 0
+}
+
+case "$1" in
+    start)  start_app ;;
+    stop)   stop_app ;;
+    status) if is_running; then exit 0; else exit 3; fi ;;
+    *)      exit 1 ;;
+esac

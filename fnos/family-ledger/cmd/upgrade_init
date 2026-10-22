@@ -1,0 +1,4 @@
+#!/bin/bash
+# 升级前：停止旧进程
+bash "${0%/*}/main" stop
+exit 0

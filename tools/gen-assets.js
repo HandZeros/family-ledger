@@ -103,6 +103,12 @@ for (const [sub, [w, h]] of Object.entries(SPLASH)) {
   TASKS.push([`mobile/android/app/src/main/res/${sub}/splash.png`, w, h, () => splash(w, h)]);
 }
 
+// 4. 飞牛 FPK 图标（要求不透明，用全幅背景版本）
+TASKS.push(['fnos/family-ledger/ICON.PNG', 64, 64, () => maskable(64)]);
+TASKS.push(['fnos/family-ledger/ICON_256.PNG', 256, 256, () => maskable(256)]);
+TASKS.push(['fnos/family-ledger/app/ui/images/icon_64.png', 64, 64, () => maskable(64)]);
+TASKS.push(['fnos/family-ledger/app/ui/images/icon_256.png', 256, 256, () => maskable(256)]);
+
 (async () => {
   const browser = await chromium.launch({
     executablePath: CHROME,
@@ -119,7 +125,7 @@ for (const [sub, [w, h]] of Object.entries(SPLASH)) {
     );
     await page.waitForTimeout(60);
     const transparent = !rel.includes('splash');
-    await page.screenshot({ path: out, omitBackground: transparent });
+    await page.screenshot({ path: out, omitBackground: transparent, type: 'png' });
     n++;
   }
   await browser.close();

@@ -1,0 +1,12 @@
+#!/bin/bash
+# 配置变更后：持久化端口并重启应用
+PORT="${wizard_port:-5257}"
+mkdir -p "${TRIM_PKGETC}"
+cat > "${TRIM_PKGETC}/settings.conf" <<CONF
+PORT=${PORT}
+CONF
+
+bash "${0%/*}/main" stop
+sleep 1
+bash "${0%/*}/main" start
+exit 0

@@ -1,0 +1,13 @@
+{
+  ".url": {
+    "family-ledger.main": {
+      "title": "家庭账本",
+      "icon": "images/icon_{0}.png",
+      "type": "url",
+      "protocol": "http",
+      "port": "5257",
+      "url": "/",
+      "allUsers": true
+    }
+  }
+}

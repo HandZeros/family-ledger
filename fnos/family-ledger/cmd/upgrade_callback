@@ -1,0 +1,26 @@
+#!/bin/bash
+# 升级后：依赖可能变化，重新安装（复用已有 venv，速度快）
+SERVER="${TRIM_APPDEST}/server"
+VENV="${TRIM_PKGVAR}/venv"
+LOG="${TRIM_PKGVAR}/install.log"
+
+mkdir -p "${TRIM_PKGVAR}"
+echo "=== $(date) upgrade deps ===" >> "${LOG}"
+
+if [ -x "${VENV}/bin/pip" ]; then
+    "${VENV}/bin/pip" install --no-index --find-links "${SERVER}/wheels" \
+        -r "${SERVER}/requirements.txt" >> "${LOG}" 2>&1
+    rc=$?
+    if [ $rc -ne 0 ]; then
+        "${VENV}/bin/pip" install -i https://pypi.tuna.tsinghua.edu.cn/simple \
+            -r "${SERVER}/requirements.txt" >> "${LOG}" 2>&1
+        rc=$?
+    fi
+    if [ $rc -ne 0 ]; then
+        echo "依赖更新失败，详情见 ${LOG}" > "${TRIM_TEMP_LOGFILE}"
+        exit 1
+    fi
+fi
+
+bash "${0%/*}/main" start
+exit 0

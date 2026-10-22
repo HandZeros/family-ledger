@@ -1,0 +1,7 @@
+#!/bin/bash
+# 安装前：确认 Python 3.12 运行时可用
+if [ ! -x /var/apps/python312/target/bin/python3 ]; then
+    echo "缺少 Python 3.12 运行环境（python312），请先在应用中心安装该运行时。" > "${TRIM_TEMP_LOGFILE}"
+    exit 1
+fi
+exit 0

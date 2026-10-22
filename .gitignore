@@ -31,6 +31,13 @@ mobile/android/capacitor-cordova-android-plugins/build/
 # 本地产物
 dist/
 
+# 飞牛 FPK 构建产物（由 scripts/build-fpk.sh 生成）
+fnos/*.fpk
+fnos/family-ledger/app/server/app/
+fnos/family-ledger/app/server/wheels/
+tools/bin/
+.fpktest/
+
 # 系统
 .DS_Store
 Thumbs.db

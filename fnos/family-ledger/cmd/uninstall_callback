@@ -1,0 +1,11 @@
+#!/bin/bash
+# 卸载后：按用户选择决定是否删除数据
+if [ "${wizard_data_action:-keep}" = "delete" ]; then
+    [ -n "${TRIM_PKGVAR}" ] && rm -rf "${TRIM_PKGVAR}"
+    if [ -n "${TRIM_DATA_SHARE_PATHS}" ]; then
+        echo "${TRIM_DATA_SHARE_PATHS}" | tr ':' '\n' | while read -r d; do
+            [ -n "$d" ] && rm -rf "$d"
+        done
+    fi
+fi
+exit 0

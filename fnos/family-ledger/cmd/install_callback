@@ -1,0 +1,57 @@
+#!/bin/bash
+# 安装后：创建 Python 虚拟环境并安装依赖（优先使用包内离线 wheel）
+
+SERVER="${TRIM_APPDEST}/server"
+PKGVAR="${TRIM_PKGVAR}"
+VENV="${PKGVAR}/venv"
+LOG="${PKGVAR}/install.log"
+PY="/var/apps/python312/target/bin/python3"
+
+mkdir -p "${PKGVAR}" "${TRIM_PKGETC}"
+: > "${LOG}"
+
+if [ ! -x "${PY}" ]; then
+    echo "缺少 Python 3.12 运行环境（python312），请先安装该运行时后重试。" > "${TRIM_TEMP_LOGFILE}"
+    exit 1
+fi
+
+echo "=== $(date) install start ===" >> "${LOG}"
+"${PY}" --version >> "${LOG}" 2>&1
+
+if [ ! -x "${VENV}/bin/python" ]; then
+    echo "creating venv ..." >> "${LOG}"
+    "${PY}" -m venv "${VENV}" >> "${LOG}" 2>&1
+fi
+
+if [ ! -x "${VENV}/bin/pip" ]; then
+    echo "Python 虚拟环境创建失败，请检查磁盘空间后重试。" > "${TRIM_TEMP_LOGFILE}"
+    exit 1
+fi
+
+# 1) 离线安装（包内 wheel，版本已锁定）
+"${VENV}/bin/pip" install --no-index --find-links "${SERVER}/wheels" \
+    -r "${SERVER}/requirements.txt" >> "${LOG}" 2>&1
+rc=$?
+
+# 2) 离线失败时回退联网安装
+if [ $rc -ne 0 ]; then
+    echo "offline install failed($rc), fallback to pypi ..." >> "${LOG}"
+    "${VENV}/bin/pip" install -i https://pypi.tuna.tsinghua.edu.cn/simple \
+        -r "${SERVER}/requirements.txt" >> "${LOG}" 2>&1
+    rc=$?
+fi
+
+if [ $rc -ne 0 ]; then
+    echo "依赖安装失败，详情见 ${LOG}" > "${TRIM_TEMP_LOGFILE}"
+    exit 1
+fi
+
+# 默认端口写入配置（仅首次安装；升级时保留用户设置）
+if [ ! -f "${TRIM_PKGETC}/settings.conf" ]; then
+    PORT="${wizard_port:-${TRIM_SERVICE_PORT:-5257}}"
+    echo "PORT=${PORT}" > "${TRIM_PKGETC}/settings.conf"
+fi
+
+mkdir -p "${PKGVAR}/data"
+echo "=== install done ===" >> "${LOG}"
+exit 0

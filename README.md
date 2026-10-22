@@ -224,7 +224,78 @@ cd mobile && npx cap sync android
 
 ---
 
-## 五、使用流程
+## 五、飞牛 NAS（fnOS）安装
+
+飞牛应用中心里可以像装普通套件一样安装，不用碰 Docker。
+
+### 5.1 下载安装包
+
+**https://github.com/HandZeros/family-ledger/releases/latest/download/family-ledger.fpk**
+
+（这个链接永远指向最新版；Release 页面里也能看到带版本号的 `family-ledger-x.y.z.fpk`）
+
+### 5.2 安装
+
+1. 打开飞牛的 **应用中心**，右上角 **设置 → 手动安装**，允许手动安装第三方应用（只需一次）
+2. 把 `.fpk` 文件上传，按向导点下一步（可改访问端口，默认 `5257`）
+3. 安装过程会自动安装 `python312` 运行时并创建独立虚拟环境，**不联网也能装**（依赖 wheel 已打在包里）
+
+命令行安装也可以：
+
+```bash
+appcenter-cli install-fpk family-ledger.fpk
+# 静默安装（跳过向导）
+appcenter-cli install-fpk family-ledger.fpk --env config.env
+```
+
+`config.env` 内容：
+
+```ini
+wizard_port=5257
+```
+
+### 5.3 使用
+
+安装完桌面会出现「家庭账本」图标，点开即进入首次引导，设置账本名称和管理员账号。
+
+- 局域网访问：`http://NAS的IP:5257`
+- 想在外面用？见「三、外网访问」，用 Cloudflare Tunnel 指到 `http://NAS的IP:5257` 即可
+- 手机 App 里填同一个地址
+
+### 5.4 数据与备份
+
+| 内容 | 位置 |
+| --- | --- |
+| 账本数据库 | `/vol1/@appdata/family-ledger/data/ledger.db` |
+| 运行日志 | `/vol1/@appdata/family-ledger/info.log` |
+| 安装日志 | `/vol1/@appdata/family-ledger/install.log` |
+| 端口配置 | `/vol1/@appconf/family-ledger/settings.conf` |
+
+备份：文件管理 → 应用文件 → `family-ledger`，把整个 `data` 目录复制走即可。
+也可以在应用内「账本 → 导出账单」按月导出 CSV。
+
+### 5.5 改端口 / 升级 / 卸载
+
+- **改端口**：应用中心 → 家庭账本 → 设置 → 修改访问端口，保存后自动重启
+- **升级**：把新版本 `.fpk` 再上传安装一次，数据保留
+- **卸载**：卸载向导会让你选「保留数据」或「删除全部数据」，默认保留
+
+### 5.6 自己构建 fpk
+
+```bash
+bash scripts/build-fpk.sh
+# 产物：dist/family-ledger-<version>.fpk
+```
+
+脚本会：把 `app/` 代码同步进包、下载 Linux x86_64/Python3.12 的依赖 wheel、
+调用飞牛官方 `fnpack` 打包，并自检 `cmd/main` 可执行位与 `app.tgz` 结构。
+
+> 注意：打包环境必须是 **Linux/macOS**（或 GitHub Actions）。Windows 下 `fnpack` 会把
+> 脚本权限写成 666，导致应用起不来 —— 所以 CI 固定在 ubuntu 上构建。
+
+---
+
+## 六、使用流程
 
 ### 1. 管理员：为家人开通账号
 
@@ -266,7 +337,7 @@ cd mobile && npx cap sync android
 
 ---
 
-## 六、目录结构
+## 七、目录结构
 
 ```
 .
@@ -298,8 +369,19 @@ cd mobile && npx cap sync android
 │   ├── capacitor.config.json
 │   ├── package.json
 │   └── android/                  # 原生工程（图标/启动屏已品牌化）
-├── tools/gen-assets.js           # 重新生成图标与启动图
-├── .github/workflows/android.yml # 自动构建 APK
+├── fnos/family-ledger/           # 飞牛 FPK 打包工程
+│   ├── manifest                  # 应用信息（appname/版本/端口/依赖 python312）
+│   ├── cmd/                      # 生命周期脚本（启动/停止/安装/升级/卸载）
+│   ├── wizard/                   # 安装、配置、卸载向导
+│   ├── config/                   # privilege / resource
+│   └── app/ui/                   # 桌面入口配置与图标
+├── scripts/
+│   ├── build-fpk.sh              # 组装并打包 .fpk（Linux/macOS）
+│   └── publish-github.sh         # 一键推送到 GitHub
+├── tools/gen-assets.js           # 重新生成图标（PWA / Android / 飞牛）
+├── .github/workflows/
+│   ├── android.yml               # 自动构建 APK
+│   └── fnos-fpk.yml              # 自动构建 FPK
 ├── screenshots/                  # 界面预览图
 └── data/                         # 运行后生成，SQLite 数据库所在
 ```
@@ -308,7 +390,7 @@ cd mobile && npx cap sync android
 
 ---
 
-## 七、备份与恢复
+## 八、备份与恢复
 
 ```bash
 # 备份（连同 -wal/-shm 一起拷贝）
@@ -326,7 +408,7 @@ docker compose start
 
 ---
 
-## 八、配置
+## 九、配置
 
 改 `docker-compose.yml`：
 
@@ -341,7 +423,7 @@ environment:
 
 ---
 
-## 九、常见问题
+## 十、常见问题
 
 **打不开页面？**
 1. `docker compose ps` 看容器是否 Up
@@ -374,7 +456,7 @@ iOS Safari：分享 → 添加到主屏幕；Android Chrome：菜单 → 添加�
 
 ---
 
-## 十、技术说明
+## 十一、技术说明
 
 - **后端**：FastAPI + Uvicorn，SQLite（WAL 模式），每请求独立连接
 - **认证**：`scrypt` 密码哈希（标准库），HMAC-SHA256 签名的自包含令牌，30 天有效期；改密码后旧令牌（token_version）立即失效

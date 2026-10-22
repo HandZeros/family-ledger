@@ -1,0 +1,24 @@
+[
+  {
+    "stepTitle": "确认卸载",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "卸载「家庭账本」前，请确认已经导出或备份了账单数据。"
+      },
+      {
+        "type": "radio",
+        "field": "wizard_data_action",
+        "label": "账本数据如何处理",
+        "initValue": "keep",
+        "options": [
+          { "label": "保留数据（推荐）—— 重新安装后可继续使用", "value": "keep" },
+          { "label": "删除全部数据 —— 不可恢复", "value": "delete" }
+        ],
+        "rules": [
+          { "required": true, "message": "请选择数据保留选项" }
+        ]
+      }
+    ]
+  }
+]

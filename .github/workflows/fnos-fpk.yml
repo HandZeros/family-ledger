@@ -1,0 +1,49 @@
+name: Build fnOS FPK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'fnos/**'
+      - 'app/**'
+      - 'requirements.txt'
+      - 'scripts/build-fpk.sh'
+      - '.github/workflows/fnos-fpk.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build fpk
+        run: bash scripts/build-fpk.sh
+
+      - name: Add stable-named copy
+        run: |
+          fpk=$(ls dist/family-ledger-*.fpk | head -n1)
+          cp "$fpk" dist/family-ledger.fpk
+
+      - name: Upload fpk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-ledger-fpk
+          path: dist/*.fpk
+          if-no-files-found: error
+
+      - name: Attach fpk to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.fpk
