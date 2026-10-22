@@ -1,0 +1,17 @@
+# 方案 0：临时外网地址（免注册、免域名，适合先验证能不能用）
+#
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.quick.yml up -d
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.quick.yml logs quick-tunnel | grep trycloudflare
+#
+# 日志里会打印一个 https://xxxx-xxxx.trycloudflare.com 地址，手机 4G 直接可访问。
+# 注意：容器重启后地址会变，且该地址对拿到链接的人公开（仍需账号密码登录）。
+# 长期使用请改用方案 A（Cloudflare Tunnel + 自己的域名）。
+
+services:
+  quick-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: family-ledger-quick-tunnel
+    restart: "no"
+    command: tunnel --no-autoupdate --url http://family-ledger:5257
+    depends_on:
+      - family-ledger

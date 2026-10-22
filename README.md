@@ -75,7 +75,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 5257
 
 ## 三、外网访问
 
-默认只能在家里局域网访问。要让手机在外面（4G/5G）也能用，有三种方案，按自己的条件挑一个：
+默认只能在家里局域网访问。要让手机在外面（4G/5G）也能用，按自己的条件挑一个方案（想先试试可以直接用「方案 0」，不用注册）：
 
 | 你的条件 | 推荐方案 | 难度 |
 | --- | --- | --- |
@@ -84,6 +84,19 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 5257
 | 已经有 Nginx 在跑别的服务 | 复用现有 Nginx | ★★ |
 
 > ⚠️ 无论用哪种，**外网一定要走 HTTPS**。直接把 `5257` 端口映射到公网是明文传输，密码会被中间人看到。
+
+### 方案 0：临时地址（免注册，1 分钟验证）
+
+想立刻用手机 4G 试一下，连域名都不用：
+
+```bash
+docker compose -f docker-compose.yml -f deploy/docker-compose.quick.yml up -d
+docker compose -f docker-compose.yml -f deploy/docker-compose.quick.yml logs quick-tunnel | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com'
+```
+
+第二条命令会打印一个 `https://xxx-xxx.trycloudflare.com` 地址，手机直接打开就能用（仍然要账号密码登录）。
+
+> 这个地址是临时的：容器重启就会变，且拿到链接的人都能访问登录页。**长期使用请选方案 A**。
 
 ### 方案 A：Cloudflare Tunnel（推荐，不用公网 IP）
 
@@ -269,6 +282,7 @@ cd mobile && npx cap sync android
 │       ├── manifest.webmanifest
 │       └── sw.js                 # Service Worker（离线壳缓存）
 ├── deploy/                       # 外网访问
+│   ├── docker-compose.quick.yml  # 方案 0：临时 trycloudflare 地址
 │   ├── docker-compose.caddy.yml  # 方案 A：Caddy 自动 HTTPS
 │   ├── docker-compose.tunnel.yml # 方案 B：Cloudflare Tunnel
 │   ├── Caddyfile
