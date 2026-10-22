@@ -28,6 +28,9 @@ mobile/android/capacitor-cordova-android-plugins/build/
 # AI 工作记忆（本地，不参与发布）
 .workbuddy/
 
+# 本地产物
+dist/
+
 # 系统
 .DS_Store
 Thumbs.db

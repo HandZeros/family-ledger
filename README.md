@@ -176,7 +176,13 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 ### 方式二：APK 安装包（真正的 App，可离线保留入口）
 
-仓库里已经带了完整的 Android 工程（Capacitor 壳），`mobile/` 目录：
+**直接下载**（每次发版自动构建，Android 手机点开即装）：
+
+<https://github.com/HandZeros/family-ledger/releases/latest/download/app-debug.apk>
+
+装好后打开 App，第一次输入服务器地址即可（如 `http://192.168.1.10:5257`），之后会记住。
+
+仓库里还带了完整的 Android 工程（Capacitor 壳），`mobile/` 目录：
 
 - `mobile/www/` —— 连接页（输入服务器地址 → 跳转到你的账本）
 - `mobile/android/` —— 原生工程（应用名、图标、启动屏都已换成家庭账本品牌）
