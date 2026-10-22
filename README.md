@@ -34,8 +34,8 @@
 需要已安装 Docker（Windows / macOS 装 Docker Desktop，NAS 用 Container Manager / Docker）。
 
 ```bash
-# 进入项目目录
-cd 记账软件开发
+# 进入项目目录（git clone 后）
+cd family-ledger
 
 # 构建并启动（首次构建约 1~2 分钟）
 docker compose up -d --build
@@ -380,31 +380,26 @@ iOS Safari：分享 → 添加到主屏幕；Android Chrome：菜单 → 添加�
 
 ---
 
-## 附：发布到 GitHub
+## 附：仓库与后续维护
 
-仓库已经初始化好（分支 `main`，含首次提交），只差推到远端。
+- 仓库：<https://github.com/HandZeros/family-ledger>（公开）
+- 默认分支：`main`
 
-**方式一：用脚本（推荐）**
-
-```bash
-bash scripts/publish-github.sh
-```
-
-按提示粘贴一次 PAT，脚本会自动创建仓库、推送并配好 `origin`。token 只在本次 `git push` 中使用，不会写进 `.git/config`。
-
-**方式二：手动**
-
-1. 打开 <https://github.com/new>，仓库名填 `family-ledger`，**不要**勾选 README / .gitignore（保持空仓库）
-2. 然后执行：
+日常改动：
 
 ```bash
-git remote add origin https://github.com/HandZeros/family-ledger.git
-git push -u origin main
+git add -A
+git commit -m "说明这次改了什么"
+git push
 ```
 
-> GitHub 从 2021 年起就不支持用账号密码推送了，必须用 PAT（个人访问令牌）。
-> 生成地址：<https://github.com/settings/tokens> —— 经典 token 勾选 `repo` 即可。
+> GitHub 已不支持用账号密码推送，必须用 PAT（<https://github.com/settings/tokens>）。经典 token 勾选 `repo`；如果还要推送 `.github/workflows/` 下的文件，需再勾 `workflow`。
 
-推上去之后：
-- **Actions → Build Android APK** 可手动触发构建，产物在 Artifacts 里
-- 打 tag 会自动创建 Release 并附上 APK：`git tag v1.0.0 && git push origin v1.0.0`
+### 启用「自动构建 APK」
+
+Actions 工作流没随仓库一起推送（推送它需要带 `workflow` 权限的 token），启用方式二选一：
+
+1. **网页添加**：打开 <https://github.com/HandZeros/family-ledger/new/main?filename=.github/workflows/android.yml>，把 `docs/android-workflow.yml` 的内容整段粘进去，Commit 即可
+2. **换 token**：用带 `workflow` 权限的 token 执行 `git push`
+
+启用后：**Actions → Build Android APK → Run workflow**，跑完在 Artifacts 下载 `app-debug.apk`。
