@@ -16,6 +16,7 @@
     route: 'home',
     month: '',
     filter: { kind: 'all', userId: 0 },
+    statsLevel: 'top',
     data: { tx: null, stats: null, accounts: null, categories: null, members: null, budgets: null, users: null },
     authForm: { username: '', password: '', server: (localStorage.getItem(LS_API) || location.origin), editingServer: false, site: '' },
     setupForm: { site: '家庭账本', username: '', display_name: '', password: '', confirm: '' },
@@ -460,8 +461,34 @@
       return `<div class="page-head"><h1>统计</h1></div><div class="card pad"><div class="skeleton" style="height:160px"></div></div>`;
     }
     const kind = state.statsKind || 'expense';
-    const cats = s.categories[kind] || [];
     const total = kind === 'expense' ? s.expense : s.income;
+    const level = state.statsLevel || 'top';
+    const raw = s.categories[kind] || [];
+    let cats = raw;
+    if (level === 'top') {
+      // 按一级分类汇总：把每个二级分类的金额累加到所属分组
+      const map = new Map();
+      raw.forEach((c) => {
+        const key = c.parent_id || c.id;
+        const cur = map.get(key);
+        if (cur) {
+          cur.amount += c.amount;
+          cur.subs += 1;
+        } else {
+          map.set(key, {
+            id: key,
+            name: c.parent_name || c.name,
+            icon: c.parent_icon || c.icon,
+            color: c.parent_color || c.color,
+            amount: c.amount,
+            subs: 1,
+          });
+        }
+      });
+      cats = [...map.values()]
+        .map((c) => ({ ...c, amount: Math.round(c.amount * 100) / 100, pct: total ? Math.round((c.amount * 1000) / total) / 10 : 0 }))
+        .sort((a, b) => b.amount - a.amount);
+    }
 
     const donut = cats.length
       ? `<div class="donut-box">
@@ -476,7 +503,9 @@
         (c) => `<div class="row" style="padding:9px 0">
           <div class="ico" style="background:${tint(c.color)};width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:15px">${esc(c.icon)}</div>
           <div class="nm" style="flex:1;min-width:0">
-            <div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${esc(c.name)}</span>
+            <div style="display:flex;justify-content:space-between;font-size:13.5px"><span>${esc(c.name)}${
+              level === 'sub' && c.parent_name && c.parent_name !== c.name ? `<span class="hint" style="margin-left:5px;font-weight:400">· ${esc(c.parent_name)}</span>` : ''
+            }</span>
             <span class="num" style="font-weight:650">¥${fmt(c.amount)}</span></div>
             <div class="bar-track"><div style="height:100%;width:${Math.min(c.pct, 100)}%;background:${c.color};border-radius:99px"></div></div>
           </div>
@@ -541,7 +570,10 @@
             <button class="${kind === 'expense' ? 'on' : ''}" data-act="stats-kind" data-kind="expense">支出</button>
             <button class="${kind === 'income' ? 'on' : ''}" data-act="stats-kind" data-kind="income">收入</button>
           </div>
-          <span class="hint">按分类</span>
+          <div class="seg seg-mini">
+            <button class="${level === 'top' ? 'on' : ''}" data-act="stats-level" data-level="top">一级</button>
+            <button class="${level === 'sub' ? 'on' : ''}" data-act="stats-level" data-level="sub">二级</button>
+          </div>
         </div>
         <div class="donut-wrap">${donut}</div>
         <div class="cat-legend">${legend || '<div class="empty" style="padding:10px 0"><p>暂无数据</p></div>'}</div>
@@ -590,15 +622,33 @@
         </div>`;
 
     const catBlock = (kind, title) => {
-      const list = (cats || []).filter((c) => c.kind === kind);
-      return `<div class="sec-title"><span>${title}</span>${can('manage_categories') ? `<button class="link" data-act="new-category" data-kind="${kind}">+ 添加</button>` : ''}</div>
-        <div class="chips cat-chips">${list
+      const groups = catTree(kind);
+      const editable = can('manage_categories');
+      return `<div class="sec-title"><span>${title}</span>${
+        editable ? `<button class="link" data-act="new-category" data-kind="${kind}">+ 一级分类</button>` : ''
+      }</div>
+      <div class="cat-tree">
+        ${groups
           .map(
-            (c) => `<span class="chip"><span>${esc(c.icon)}</span>${esc(c.name)}${
-              can('manage_categories') ? `<button class="del" data-act="del-category" data-id="${c.id}" title="删除">×</button>` : ''
-            }</span>`
+            (g) => `<div class="cat-group">
+            <div class="cg-head">
+              <span class="cg-ico" style="background:${tint(g.color)}">${esc(g.icon)}</span>
+              <b>${esc(g.name)}</b>
+              <span class="cg-cnt">${g.children.length}</span>
+              ${editable ? `<button class="del" data-act="del-category" data-id="${g.id}" title="删除一级分类">×</button>` : ''}
+            </div>
+            <div class="chips cat-chips">${g.children
+              .map(
+                (c) => `<span class="chip"><span>${esc(c.icon)}</span>${esc(c.name)}${
+                  editable ? `<button class="del" data-act="del-category" data-id="${c.id}" title="删除">×</button>` : ''
+                }</span>`
+              )
+              .join('')}</div>
+            ${editable ? `<button class="link cg-add" data-act="new-category" data-kind="${kind}" data-parent="${g.id}">+ 添加二级分类</button>` : ''}
+          </div>`
           )
-          .join('')}</div>`;
+          .join('') || '<div class="hint" style="padding:8px 0">暂无分类</div>'}
+      </div>`;
     };
 
     return `<div class="page-head">
@@ -693,7 +743,7 @@
     <div class="mt24">
       <button class="btn ghost block" data-act="logout" style="color:var(--expense)">${icon('logout')} 退出登录</button>
     </div>
-    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.1 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
+    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.2 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
   }
 
   // -------------------------------------------------- 成员管理
@@ -794,18 +844,38 @@
     if (!silent) toast('已退出登录');
   }
 
+  // -------------------------------------------------- 分类树工具
+  // 分类是两级结构：一级分类 parent_id 为 null，二级分类挂在下面
+  function catTree(kind) {
+    const list = (state.data.categories || []).filter((c) => c.kind === kind);
+    const byParent = {};
+    list.forEach((c) => {
+      if (c.parent_id) (byParent[c.parent_id] = byParent[c.parent_id] || []).push(c);
+    });
+    return list
+      .filter((c) => !c.parent_id)
+      .map((p) => ({ ...p, children: byParent[p.id] || [] }));
+  }
+
+  function catFind(id) {
+    return (state.data.categories || []).find((c) => c.id === id) || null;
+  }
+
   // -------------------------------------------------- 记账抽屉
   function openTxSheet(editTx, kind) {
     const cats = state.data.categories || [];
     const accounts = state.data.accounts || [];
     const initKind = editTx ? editTx.kind : kind || 'expense';
-    const catsOfKind = cats.filter((c) => c.kind === initKind);
+    const initGroups = catTree(initKind).filter((g) => g.children.length);
+    const initCat = editTx && editTx.category ? catFind(editTx.category.id) : null;
+    const firstGroup = initGroups[0];
     const draft = {
       id: editTx ? editTx.id : null,
       kind: initKind,
       amountStr: editTx ? String(editTx.amount) : '',
       base: 0,
-      categoryId: editTx && editTx.category ? editTx.category.id : catsOfKind[0] ? catsOfKind[0].id : null,
+      categoryId: initCat ? initCat.id : firstGroup ? firstGroup.children[0].id : null,
+      groupId: initCat ? initCat.parent_id || initCat.id : firstGroup ? firstGroup.id : null,
       accountId: editTx && editTx.account ? editTx.account.id : accounts[0] ? accounts[0].id : null,
       toAccountId: editTx && editTx.to_account ? editTx.to_account.id : accounts[1] ? accounts[1].id : null,
       date: editTx ? editTx.date : todayStr(),
@@ -836,7 +906,20 @@
   function renderTxBody() {
     const d = window.__draft;
     if (!d) return;
-    const cats = (state.data.categories || []).filter((c) => (d.kind === 'transfer' ? false : c.kind === d.kind));
+    const groups = d.kind === 'transfer' ? [] : catTree(d.kind).filter((g) => g.children.length);
+    let activeGroup = null;
+    if (d.kind !== 'transfer') {
+      activeGroup = groups.find((g) => g.id === d.groupId) || groups[0] || null;
+      if (activeGroup) {
+        d.groupId = activeGroup.id;
+        // 选中的二级分类必须落在当前一级分类里
+        if (!activeGroup.children.some((c) => c.id === d.categoryId)) {
+          d.categoryId = activeGroup.children[0] ? activeGroup.children[0].id : null;
+        }
+      } else {
+        d.categoryId = null;
+      }
+    }
     const accounts = state.data.accounts || [];
     const disp = d.amountStr === '' ? '0.00' : d.amountStr;
     const sub = d.base ? `${d.kind === 'expense' ? '合计' : '合计'} ¥${fmt(d.base + (parseFloat(d.amountStr) || 0))}` : '';
@@ -856,10 +939,16 @@
           <div class="pill-row">${accounts.map((a) => `<button class="pill ${d.toAccountId === a.id ? 'on' : ''}" data-act="pick-acc-to" data-id="${a.id}">${esc(a.icon)} ${esc(a.name)}</button>`).join('')}</div>
         </div>
       ` : `
+        <div class="cat-tabs">
+          ${groups.map((g) => `<button class="cat-tab ${d.groupId === g.id ? 'on' : ''}" data-act="pick-group" data-id="${g.id}">
+            <span class="gi" style="background:${tint(g.color)}">${esc(g.icon)}</span><span class="tn">${esc(g.name)}</span>
+          </button>`).join('')}
+        </div>
         <div class="cat-grid">
-          ${cats.map((c) => `<button class="cat-cell ${d.categoryId === c.id ? 'on' : ''}" data-act="pick-cat" data-id="${c.id}">
+          ${(activeGroup ? activeGroup.children : []).map((c) => `<button class="cat-cell ${d.categoryId === c.id ? 'on' : ''}" data-act="pick-cat" data-id="${c.id}">
             <div class="ico" style="background:${tint(c.color)}">${esc(c.icon)}</div><div class="nm">${esc(c.name)}</div>
           </button>`).join('')}
+          ${!groups.length ? '<div class="hint" style="grid-column:1/-1;padding:14px 0;text-align:center">还没有分类，去「账本」里添加</div>' : ''}
         </div>
         <div class="field mt16"><label>账户</label>
           <div class="pill-row">${accounts.map((a) => `<button class="pill ${d.accountId === a.id ? 'on' : ''}" data-act="pick-acc" data-id="${a.id}">${esc(a.icon)} ${esc(a.name)}</button>`).join('')}</div>
@@ -895,6 +984,12 @@
     const kpEl = $('#keypad');
     if (bodyEl) bodyEl.innerHTML = body;
     if (kpEl) kpEl.innerHTML = keypadHtml;
+
+    // 一级分类较多，切换后把当前分组滚进可视区，避免高亮项藏在屏幕外
+    const onTab = bodyEl && bodyEl.querySelector('.cat-tab.on');
+    if (onTab && onTab.scrollIntoView) {
+      onTab.scrollIntoView({ inline: 'center', block: 'nearest' });
+    }
 
     const dateEl = $('#txDate');
     if (dateEl) dateEl.addEventListener('change', (e) => { window.__draft.date = e.target.value; });
@@ -1164,13 +1259,15 @@
     } catch (e) { toast(e.message, 'err'); }
   }
 
-  function openCategorySheet(kind) {
+  function openCategorySheet(kind, parentId, parentName) {
+    const kindLabel = kind === 'expense' ? '支出' : '收入';
+    const title = parentId ? `添加二级分类 · ${parentName || ''}` : `添加${kindLabel}一级分类`;
     openSheet(
-      `${sheetHead('添加' + (kind === 'expense' ? '支出' : '收入') + '分类')}
+      `${sheetHead(title)}
       <div class="sheet-body">
-        <form data-form="category" data-kind="${kind}">
+        <form data-form="category" data-kind="${kind}" data-parent="${parentId || ''}">
           <div class="field"><label>分类名称</label>
-            <input class="input" name="name" placeholder="例如：早餐、话费" maxlength="10" />
+            <input class="input" name="name" placeholder="${parentId ? '例如：早餐、话费' : '例如：食品酒水、行车交通'}" maxlength="10" />
           </div>
           <div class="field"><label>图标</label>
             <input class="input" name="icon" id="catIcon" value="🍜" maxlength="4" />
@@ -1186,11 +1283,13 @@
     const form = $('[data-form="category"]');
     const fd = new FormData(form);
     const kind = form.dataset.kind;
+    const parentId = form.dataset.parent ? Number(form.dataset.parent) : null;
     const colors = ['#E2584A', '#4C9A5E', '#4A7DBB', '#9B7EBD', '#D9739B', '#D9A23B', '#4E9CA6', '#8A6FBF'];
     const body = {
       name: (fd.get('name') || '').trim(),
       icon: (fd.get('icon') || '📦').trim() || '📦',
       kind,
+      parent_id: parentId,
       color: colors[Math.floor(Math.random() * colors.length)],
     };
     if (!body.name) { toast('请填写分类名称'); return; }
@@ -1357,15 +1456,31 @@
           v.amountStr = v.amountStr;
           v.base = 0;
           if (v.kind !== 'transfer') {
-            const list = (state.data.categories || []).filter((c) => c.kind === v.kind);
-            if (!list.find((c) => c.id === v.categoryId)) v.categoryId = list[0] ? list[0].id : null;
+            const gs = catTree(v.kind).filter((g) => g.children.length);
+            const g = gs.find((x) => x.id === v.groupId) || gs[0] || null;
+            v.groupId = g ? g.id : null;
+            const keep = g && g.children.some((c) => c.id === v.categoryId);
+            v.categoryId = keep ? v.categoryId : g && g.children[0] ? g.children[0].id : null;
           }
           renderTxBody();
           break;
-        case 'pick-cat':
-          v.categoryId = Number(el.dataset.id);
+        case 'pick-group': {
+          const gid = Number(el.dataset.id);
+          const g = catTree(v.kind).find((x) => x.id === gid);
+          v.groupId = gid;
+          if (g && g.children.length && !g.children.some((c) => c.id === v.categoryId)) {
+            v.categoryId = g.children[0].id;
+          }
           renderTxBody();
           break;
+        }
+        case 'pick-cat': {
+          const cat = catFind(Number(el.dataset.id));
+          v.categoryId = Number(el.dataset.id);
+          if (cat && cat.parent_id) v.groupId = cat.parent_id;
+          renderTxBody();
+          break;
+        }
         case 'pick-acc':
           v.accountId = Number(el.dataset.id);
           renderTxBody();
@@ -1379,6 +1494,10 @@
           break;
         case 'stats-kind':
           state.statsKind = el.dataset.kind;
+          render();
+          break;
+        case 'stats-level':
+          state.statsLevel = el.dataset.level;
           render();
           break;
         case 'filter-kind':
@@ -1431,14 +1550,17 @@
           render();
           break;
         }
-        case 'new-category':
-          openCategorySheet(el.dataset.kind || 'expense');
+        case 'new-category': {
+          const pid = el.dataset.parent ? Number(el.dataset.parent) : null;
+          const p = pid ? catFind(pid) : null;
+          openCategorySheet(el.dataset.kind || 'expense', pid, p ? p.name : '');
           break;
+        }
         case 'save-category':
           await saveCategory();
           break;
         case 'del-category': {
-          if (!confirm('删除该分类？已记录的流水会显示为「未分类」。')) return;
+          if (!confirm('删除该分类？其下的二级分类会一起删除，已记录的流水会显示为「未分类」。')) return;
           await request('/api/categories/' + el.dataset.id, { method: 'DELETE' });
           state.data.categories = null;
           await loadCore(true);

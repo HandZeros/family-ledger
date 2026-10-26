@@ -48,7 +48,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="家庭账本",
-    version="1.1.0",
+    version="1.2.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
@@ -190,6 +190,7 @@ class CategoryIn(BaseModel):
     kind: str = "expense"
     icon: str = "📦"
     color: str = "#8A8578"
+    parent_id: Optional[int] = None
 
 
 class CategoryPatch(BaseModel):
@@ -563,29 +564,74 @@ def delete_account(account_id: int, user: dict = Depends(require("manage_account
 
 # ---------------------------------------------------------------- 分类
 @app.get("/api/categories")
-def list_categories(user: dict = Depends(current_user), conn: sqlite3.Connection = Depends(get_db)):
-    rows = conn.execute(
-        "SELECT * FROM categories WHERE archived = 0 ORDER BY kind, sort, id"
-    ).fetchall()
+def list_categories(
+    kind: Optional[str] = None,
+    user: dict = Depends(current_user),
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    sql = (
+        "SELECT c.*, COALESCE(p.sort, c.sort) gsort FROM categories c "
+        "LEFT JOIN categories p ON p.id = c.parent_id WHERE c.archived = 0"
+    )
+    args: list = []
+    if kind in ("income", "expense"):
+        sql += " AND c.kind = ?"
+        args.append(kind)
+    # 一级分类按 sort 排，二级紧跟其父；前端据 parent_id 组装树
+    sql += " ORDER BY c.kind, gsort, c.parent_id IS NOT NULL, c.sort, c.id"
+    rows = conn.execute(sql, args).fetchall()
     return [
-        {"id": r["id"], "name": r["name"], "kind": r["kind"], "icon": r["icon"], "color": r["color"]}
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "kind": r["kind"],
+            "icon": r["icon"],
+            "color": r["color"],
+            "parent_id": r["parent_id"],
+        }
         for r in rows
     ]
 
 
 @app.post("/api/categories")
 def create_category(payload: CategoryIn, user: dict = Depends(require("manage_categories")), conn: sqlite3.Connection = Depends(get_db)):
-    if payload.kind not in ("income", "expense"):
+    kind = payload.kind
+    parent_id = payload.parent_id
+    if parent_id:
+        parent = conn.execute(
+            "SELECT * FROM categories WHERE id = ? AND archived = 0", (parent_id,)
+        ).fetchone()
+        if not parent:
+            raise HTTPException(status_code=404, detail="上级分类不存在")
+        if parent["parent_id"]:
+            raise HTTPException(status_code=400, detail="只支持两级分类")
+        kind = parent["kind"]
+    if kind not in ("income", "expense"):
         raise HTTPException(status_code=400, detail="类型不合法")
     name = payload.name.strip()[:10]
     if not name:
         raise HTTPException(status_code=400, detail="请填写分类名称")
-    sort = conn.execute(
-        "SELECT COALESCE(MAX(sort),0)+1 s FROM categories WHERE kind = ?", (payload.kind,)
-    ).fetchone()["s"]
+    dup = conn.execute(
+        "SELECT 1 FROM categories WHERE archived = 0 AND kind = ? AND name = ? "
+        "AND COALESCE(parent_id, 0) = ?",
+        (kind, name, parent_id or 0),
+    ).fetchone()
+    if dup:
+        raise HTTPException(status_code=400, detail="同一级下已有同名分类")
+    if parent_id:
+        sort = conn.execute(
+            "SELECT COALESCE(MAX(sort),0)+1 s FROM categories WHERE parent_id = ?", (parent_id,)
+        ).fetchone()["s"]
+        color = payload.color if payload.color != "#8A8578" else parent["color"]
+    else:
+        sort = conn.execute(
+            "SELECT COALESCE(MAX(sort),0)+1 s FROM categories WHERE kind = ? AND parent_id IS NULL",
+            (kind,),
+        ).fetchone()["s"]
+        color = payload.color
     cur = conn.execute(
-        "INSERT INTO categories(name, kind, icon, color, sort) VALUES(?,?,?,?,?)",
-        (name, payload.kind, payload.icon[:4] or "📦", payload.color, sort),
+        "INSERT INTO categories(name, kind, icon, color, parent_id, sort) VALUES(?,?,?,?,?,?)",
+        (name, kind, payload.icon[:4] or "📦", color, parent_id, sort),
     )
     conn.commit()
     return {"id": cur.lastrowid}
@@ -622,6 +668,8 @@ def update_category(
 
 @app.delete("/api/categories/{category_id}")
 def delete_category(category_id: int, user: dict = Depends(require("manage_categories")), conn: sqlite3.Connection = Depends(get_db)):
+    # 删一级分类时连同其二级分类一起归档（流水保留，仍能显示原分类名）
+    conn.execute("UPDATE categories SET archived = 1 WHERE parent_id = ?", (category_id,))
     conn.execute("UPDATE categories SET archived = 1 WHERE id = ?", (category_id,))
     conn.commit()
     return {"ok": True}
@@ -831,8 +879,11 @@ def stats(
         f"""
         SELECT COALESCE(t.category_id, 0) cid, COALESCE(c.name,'未分类') cname,
                COALESCE(c.icon,'📦') cicon, COALESCE(c.color,'#8A8578') ccolor,
+               c.parent_id pid, p.name pname, p.icon picon, p.color pcolor,
                t.kind, SUM(t.amount_cents) total
-        FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        LEFT JOIN categories p ON p.id = c.parent_id
         WHERE t.date BETWEEN ? AND ? AND t.kind IN ('income','expense'){sc}
         GROUP BY t.kind, cid
         ORDER BY total DESC
@@ -845,16 +896,23 @@ def stats(
     for r in cat_rows:
         total = r["total"]
         denom = base[r["kind"]] or 1
+        # 一级分类本身被直接记账时（移植数据/自定义），归到自己名下
+        top = r["pid"] or r["cid"]
         cat_map[r["kind"]].append(
             {
                 "id": r["cid"],
                 "name": r["cname"],
                 "icon": r["cicon"],
                 "color": r["ccolor"],
+                "parent_id": top if r["pid"] else None,
+                "parent_name": r["pname"] if r["pid"] else r["cname"],
+                "parent_icon": r["picon"] if r["pid"] else r["cicon"],
+                "parent_color": r["pcolor"] if r["pid"] else r["ccolor"],
                 "amount": yuan(total),
                 "pct": round(total * 100 / denom, 1),
             }
         )
+
 
     daily_rows = conn.execute(
         f"""
@@ -995,10 +1053,12 @@ def export_csv(
     rows = conn.execute(
         f"""
         SELECT t.date, t.kind, t.amount_cents, COALESCE(c.name,'未分类') cat,
+               COALESCE(p.name,'') pcat,
                COALESCE(a.name,'-') acc, COALESCE(a2.name,'-') to_acc,
                t.note, u.display_name uname
         FROM transactions t
         LEFT JOIN categories c ON c.id = t.category_id
+        LEFT JOIN categories p ON p.id = c.parent_id
         LEFT JOIN accounts a ON a.id = t.account_id
         LEFT JOIN accounts a2 ON a2.id = t.to_account_id
         JOIN users u ON u.id = t.user_id
@@ -1010,13 +1070,14 @@ def export_csv(
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["日期", "类型", "分类", "金额(元)", "账户", "转入账户", "备注", "记录人"])
+    writer.writerow(["日期", "类型", "一级分类", "分类", "金额(元)", "账户", "转入账户", "备注", "记录人"])
     kind_label = {"income": "收入", "expense": "支出", "transfer": "转账"}
     for r in rows:
         writer.writerow(
             [
                 r["date"],
                 kind_label.get(r["kind"], r["kind"]),
+                r["pcat"],
                 r["cat"],
                 f"{r['amount_cents'] / 100:.2f}",
                 r["acc"],

@@ -1,5 +1,5 @@
 appname = family-ledger
-version = 1.1.0
+version = 1.2.0
 display_name = 家庭账本
 desc = 一家人，一本账。家庭成员各自用手机记录自己的收支，管理员统一分配账号与权限。<br/>功能：分类记账、日历分组流水、分类环形图、月度趋势、预算进度、账户余额、CSV 导出。<br/>数据保存在本机，不经过任何第三方服务。
 source = thirdparty
@@ -22,4 +22,4 @@ desktop_applaunchname = family-ledger.main
 
 install_dep_apps = python312
 
-changelog = 1.1.0 安卓 App 支持直接在应用内记账，无需跳转浏览器<br/>1.0.0 首个版本：家庭成员记账、权限分配、统计报表、预算管理
+changelog = 1.2.0 分类升级为两级结构（参考随手记，13 组支出 / 4 组收入，140+ 子分类）<br/>1.1.0 安卓 App 支持直接在应用内记账，无需跳转浏览器<br/>1.0.0 首个版本：家庭成员记账、权限分配、统计报表、预算管理

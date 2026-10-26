@@ -345,8 +345,33 @@ input, select { outline: none; }
 
 /* 分类胶囊：三列对齐 */
 .cat-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.cat-chips .chip { justify-content: space-between; padding: 8px 9px; }
-.cat-chips .chip > span:first-of-type { margin-right: 4px; }
+.cat-chips .chip {
+  justify-content: space-between; gap: 4px; padding: 8px 6px 8px 9px;
+  font-size: 12.5px; white-space: nowrap;
+}
+.cat-chips .chip > span:first-of-type { margin-right: 2px; }
+.cat-chips .chip .del { font-size: 14px; padding: 0; }
+
+/* 两级分类：账本页的分组卡片 */
+.cat-tree { display: flex; flex-direction: column; gap: 10px; }
+.cat-group {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px 13px 10px; box-shadow: var(--shadow-sm);
+}
+.cg-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.cg-ico {
+  width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-size: 15px;
+}
+.cg-head b { font-size: 13.5px; letter-spacing: -0.1px; }
+.cg-cnt {
+  font-size: 11px; color: var(--muted); background: var(--bg-deep);
+  border-radius: 999px; padding: 1px 7px;
+}
+.cg-head .del {
+  margin-left: auto; color: var(--muted); font-size: 17px; line-height: 1; padding: 0 4px;
+}
+.cg-add { margin-top: 9px; font-size: 12px; color: var(--brand); }
+.chip .del { color: var(--muted); }
 
 /* ---------- 我的 ---------- */
 .me-card {
@@ -466,6 +491,28 @@ select.input {
 .amount-sub { text-align: right; font-size: 11.5px; color: var(--muted); min-height: 16px; padding-right: 4px; }
 
 .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+
+/* 记账抽屉：一级分类横滑标签 + 二级分类网格 */
+.cat-tabs {
+  display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.cat-tabs::-webkit-scrollbar { display: none; }
+.cat-tab {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  padding: 5px 11px 5px 5px; border-radius: 999px; font-size: 12.5px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2); white-space: nowrap;
+}
+.cat-tab .gi {
+  width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 13px;
+}
+.cat-tab.on {
+  background: var(--brand-soft); border-color: rgba(46, 107, 90, 0.28);
+  color: var(--brand); font-weight: 650;
+}
+
+/* 统计页：一级/二级切换 */
+.seg-mini button { padding: 5px 11px; font-size: 12px; }
 .cat-cell {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 5px 2px; border-radius: 12px; border: 1px solid transparent; transition: all 0.12s;

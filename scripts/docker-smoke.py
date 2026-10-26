@@ -109,10 +109,17 @@ def main() -> int:
     code, accounts = call("GET", "/api/accounts", token=TOKEN)
     ok("默认账户已创建", code == 200 and len(accounts) >= 1, f"{len(accounts)} 个")
     code, cats = call("GET", "/api/categories", token=TOKEN)
-    ok("默认分类已创建", code == 200 and len(cats) >= 10, f"{len(cats)} 个")
+    ok("默认分类已创建", code == 200 and len(cats) >= 100, f"{len(cats)} 个")
+    tops = [c for c in cats if not c.get("parent_id")]
+    leaves = [c for c in cats if c.get("parent_id")]
+    ok(
+        "分类为两级结构",
+        len(tops) >= 15 and len(leaves) >= 120,
+        f"一级 {len(tops)} / 二级 {len(leaves)}",
+    )
 
     print("[3] 记账链路")
-    expense_cat = next((c for c in cats if c.get("kind") == "expense"), None)
+    expense_cat = next((c for c in leaves if c.get("kind") == "expense"), None)
     ok("存在支出分类", expense_cat is not None)
     today = time.strftime("%Y-%m-%d")
     code, tx = call("POST", "/api/transactions", {
