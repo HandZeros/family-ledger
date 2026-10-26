@@ -1,0 +1,146 @@
+name: Publish Docker Image
+
+# 构建多架构镜像并推送到 Docker Hub（同时备份一份到 GHCR）。
+#
+# 需要的仓库 Secrets（Settings → Secrets and variables → Actions）：
+#   DOCKERHUB_USERNAME  Docker Hub 用户名
+#   DOCKERHUB_TOKEN     Docker Hub 访问令牌（Account settings → Personal access tokens，权限 Read & Write）
+# 缺少 Secret 时只推 GHCR，不会让流水线失败。
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.dockerignore'
+      - 'scripts/docker-smoke.py'
+      - '.github/workflows/docker-publish.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: family-ledger
+  PLATFORMS: linux/amd64,linux/arm64
+
+jobs:
+  verify:
+    name: 构建并自检
+    runs-on: ubuntu-latest
+    env:
+      DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+      DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 构建本机测试镜像
+        run: docker build -t ${IMAGE_NAME}:ci .
+
+      - name: 启动容器
+        run: |
+          docker run -d --name fl-ci -p 5257:5257 -e TZ=Asia/Shanghai ${IMAGE_NAME}:ci
+          for i in $(seq 1 60); do
+            if curl -fsS --max-time 3 http://127.0.0.1:5257/api/health >/dev/null 2>&1; then
+              echo "服务就绪，用时 ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::容器 60s 内未就绪"
+          docker logs fl-ci
+          exit 1
+
+      - name: 接口链路自检
+        run: python3 scripts/docker-smoke.py --base http://127.0.0.1:5257
+
+      - name: 数据持久化检查
+        run: |
+          docker exec fl-ci sh -c 'ls -l /data && test -f /data/ledger.db && echo "ledger.db 已落盘"'
+
+      - name: 容器日志
+        if: always()
+        run: docker logs fl-ci || true
+
+      - name: 清理
+        if: always()
+        run: docker rm -f fl-ci || true
+
+  publish:
+    name: 推送多架构镜像
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+      DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/family-ledger
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 组装镜像名列表
+        id: imgs
+        run: |
+          LIST=$(printf '%s' "$GHCR_IMAGE" | tr 'A-Z' 'a-z')
+          if [ -n "$DH_USER" ] && [ -n "$DH_TOKEN" ]; then
+            DH=$(printf '%s' "${DH_USER}/${IMAGE_NAME}" | tr 'A-Z' 'a-z')
+            LIST=$(printf '%s\n%s' "$LIST" "$DH")
+            echo "启用 Docker Hub：$DH"
+          else
+            echo "::notice::未配置 DOCKERHUB_USERNAME / DOCKERHUB_TOKEN，本次只推送到 GHCR"
+          fi
+          printf 'images<<EOF\n%s\nEOF\n' "$LIST" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 登录 Docker Hub
+        if: env.DH_USER != '' && env.DH_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DH_USER }}
+          password: ${{ env.DH_TOKEN }}
+
+      - name: 生成标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.imgs.outputs.images }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=short
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ env.PLATFORMS }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 输出镜像地址
+        run: |
+          echo "### 本次推送的镜像" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo ""
+          echo "${{ steps.meta.outputs.tags }}"

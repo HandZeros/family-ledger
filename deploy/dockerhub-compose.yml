@@ -1,0 +1,29 @@
+# 家庭账本 —— 直接使用 Docker Hub 上的官方镜像（无需源码、无需构建）
+#
+# 用法：
+#   1. 新建一个目录，把本文件存为 docker-compose.yml
+#   2. docker compose up -d
+#   3. 浏览器打开 http://NAS的IP:5257 ，首次进入会引导创建管理员账号
+#
+# 数据保存在当前目录的 ./data 里，删容器不丢；备份直接拷走这个目录即可。
+
+services:
+  family-ledger:
+    image: handzeros/family-ledger:latest
+    # 国内拉取慢可以换下面这个备用镜像源（内容相同）：
+    # image: ghcr.io/handzeros/family-ledger:latest
+    container_name: family-ledger
+    restart: unless-stopped
+    ports:
+      # 左边是宿主机端口，被占用时改成 8080:5257 之类
+      - "5257:5257"
+    volumes:
+      - ./data:/data
+    environment:
+      - TZ=Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5257/api/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

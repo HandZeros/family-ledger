@@ -33,6 +33,37 @@
 
 需要已安装 Docker（Windows / macOS 装 Docker Desktop，NAS 用 Container Manager / Docker）。
 
+### 方式 A：直接拉取 Docker Hub 镜像（推荐，不需要源码）
+
+镜像已在 Docker Hub 上，服务器上只要一个 compose 文件：
+
+```bash
+mkdir family-ledger && cd family-ledger
+curl -O https://raw.githubusercontent.com/HandZeros/family-ledger/main/deploy/dockerhub-compose.yml
+mv dockerhub-compose.yml docker-compose.yml
+docker compose up -d
+```
+
+或者一行命令（等同上面效果）：
+
+```bash
+docker run -d --name family-ledger --restart unless-stopped \
+  -p 5257:5257 -v $(pwd)/data:/data -e TZ=Asia/Shanghai \
+  handzeros/family-ledger:latest
+```
+
+镜像地址：
+
+| 仓库 | 地址 | 说明 |
+| --- | --- | --- |
+| Docker Hub | `handzeros/family-ledger:latest` | 主发布渠道，国内可配镜像加速 |
+| GHCR | `ghcr.io/handzeros/family-ledger:latest` | 备用源，内容与上面一致 |
+
+支持 `linux/amd64` 与 `linux/arm64`（x86 服务器、群晖、飞牛、树莓派均可直接跑）。
+可用标签：`latest`、`1.0.0`、`1.0`、`sha-xxxxxxx`。
+
+### 方式 B：从源码构建
+
 ```bash
 # 进入项目目录（git clone 后）
 cd family-ledger
@@ -358,7 +389,8 @@ bash scripts/build-fpk.sh
 │       ├── icons/                # PWA PNG 图标（192/512/maskable/apple）
 │       ├── manifest.webmanifest
 │       └── sw.js                 # Service Worker（离线壳缓存）
-├── deploy/                       # 外网访问
+├── deploy/                       # 部署与外网访问
+│   ├── dockerhub-compose.yml     # 直接使用 Docker Hub 镜像（无源码部署）
 │   ├── docker-compose.quick.yml  # 方案 0：临时 trycloudflare 地址
 │   ├── docker-compose.caddy.yml  # 方案 A：Caddy 自动 HTTPS
 │   ├── docker-compose.tunnel.yml # 方案 B：Cloudflare Tunnel
@@ -377,10 +409,12 @@ bash scripts/build-fpk.sh
 │   └── app/ui/                   # 桌面入口配置与图标
 ├── scripts/
 │   ├── build-fpk.sh              # 组装并打包 .fpk（Linux/macOS）
+│   ├── docker-smoke.py           # 镜像自检（初始化→登录→记账→统计）
 │   └── publish-github.sh         # 一键推送到 GitHub
 ├── tools/gen-assets.js           # 重新生成图标（PWA / Android / 飞牛）
 ├── .github/workflows/
 │   ├── android.yml               # 自动构建 APK
+│   ├── docker-publish.yml        # 自动构建并推送 Docker Hub / GHCR
 │   └── fnos-fpk.yml              # 自动构建 FPK
 ├── screenshots/                  # 界面预览图
 └── data/                         # 运行后生成，SQLite 数据库所在
