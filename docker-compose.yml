@@ -1,7 +1,7 @@
 services:
   family-ledger:
     build: .
-    image: family-ledger:1.0
+    image: family-ledger:1.1
     container_name: family-ledger
     restart: unless-stopped
     ports:

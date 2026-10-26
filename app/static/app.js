@@ -693,7 +693,7 @@
     <div class="mt24">
       <button class="btn ghost block" data-act="logout" style="color:var(--expense)">${icon('logout')} 退出登录</button>
     </div>
-    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.0 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
+    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.1 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
   }
 
   // -------------------------------------------------- 成员管理
@@ -1623,8 +1623,29 @@
     }
   }
 
+  // Android 壳的返回键（MainActivity 通过 evaluateJavascript 调用）：
+  // 先关弹层 → 再回首页 → 都没有则返回 'exit'，由系统把 App 退到后台。
+  window.__flHandleBack = function () {
+    try {
+      if (state.sheet) {
+        closeSheet();
+        return 'handled';
+      }
+      if (state.mode === 'setup' || !state.token || !state.user) return 'exit';
+      if (state.route && state.route !== 'home') {
+        go('home');
+        return 'handled';
+      }
+    } catch (e) {
+      /* 出任何异常都让系统接管，避免返回键卡死 */
+    }
+    return 'exit';
+  };
+
   // 启动
-  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  // App（Capacitor 壳）里跑的是本地页面，没有 Service Worker 可注册，跳过
+  const inAppShell = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  if ('serviceWorker' in navigator && location.protocol === 'https:' && !inAppShell) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
   boot();

@@ -9,6 +9,8 @@ on:
       - main
     paths:
       - 'mobile/**'
+      - 'app/static/**'
+      - 'tools/build-mobile.js'
       - '.github/workflows/android.yml'
 
 permissions:
@@ -50,6 +52,10 @@ jobs:
         working-directory: mobile
         run: npm ci
 
+      # 把 Web 端打进 App 本地资源，App 内直接跑账本界面（不跳浏览器）
+      - name: Bundle web UI into app
+        run: node tools/build-mobile.js
+
       - name: Sync web assets into native project
         working-directory: mobile
         run: npx cap sync android
@@ -73,4 +79,8 @@ jobs:
         with:
           files: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           name: 家庭账本 ${{ github.ref_name }}
-          body: 下载 app-debug.apk 安装到 Android 手机（需允许安装未知来源应用）。
+          body: |
+            下载 app-debug.apk 安装到 Android 手机（需允许安装未知来源应用）。
+
+            1.1 起账本界面直接跑在 App 内，可以直接记账，不再跳转浏览器。
+            首次打开填写服务器地址（如 http://192.168.1.10:5257），之后启动自动进入。

@@ -23,9 +23,12 @@
 
 ![桌面端](screenshots/08-desktop.png)
 
-手机 App 首次打开时的连接页（输入服务器地址，之后自动记住）：
+手机 App：首次打开填写服务器地址，之后启动直接进账本（1.1 起可在 App 内记账）
 
-<img src="screenshots/11-app-connect.png" width="300" alt="App 连接页" />
+<p>
+<img src="screenshots/11-app-connect.png" width="280" alt="App 连接页" />
+<img src="screenshots/12-app-ledger.png" width="280" alt="App 内记账" />
+</p>
 
 ---
 
@@ -60,7 +63,7 @@ docker run -d --name family-ledger --restart unless-stopped \
 | GHCR | `ghcr.io/handzeros/family-ledger:latest` | 备用源，内容与上面一致 |
 
 支持 `linux/amd64` 与 `linux/arm64`（x86 服务器、群晖、飞牛、树莓派均可直接跑）。
-可用标签：`latest`、`1.0.0`、`1.0`、`sha-xxxxxxx`。
+可用标签：`latest`、`1.1.0`、`1.1`、`sha-xxxxxxx`（每次打 tag 发版会自动追加新版本号）。
 
 ### 方式 B：从源码构建
 
@@ -205,18 +208,29 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 图标、启动方式都像原生 App，内容实时更新，不占额外存储。**日常使用推荐这个。**
 
-### 方式二：APK 安装包（真正的 App，可离线保留入口）
+### 方式二：APK 安装包（真正的 App，可直接在 App 里记账）
 
 **直接下载**（每次发版自动构建，Android 手机点开即装）：
 
 <https://github.com/HandZeros/family-ledger/releases/latest/download/app-debug.apk>
 
-装好后打开 App，第一次输入服务器地址即可（如 `http://192.168.1.10:5257`），之后会记住。
+从 **1.1** 起，账本界面直接跑在 App 自己的 WebView 里：**打开 App 就能记账、看统计、管成员，不再跳到系统浏览器**。
 
-仓库里还带了完整的 Android 工程（Capacitor 壳），`mobile/` 目录：
+<img src="screenshots/12-app-ledger.png" width="300" alt="App 内记账" />
 
-- `mobile/www/` —— 连接页（输入服务器地址 → 跳转到你的账本）
-- `mobile/android/` —— 原生工程（应用名、图标、启动屏都已换成家庭账本品牌）
+首次打开填写服务器地址（如 `http://192.168.1.10:5257`），之后启动自动进入账本；返回键会先关闭弹层、回到明细页，再按才退到后台。
+
+实现方式：构建时把 Web 端（`app/static`）打进 App 的本地资源，接口仍指向你的服务器。所以
+
+- 界面加载不依赖网络，点开即用，服务器慢也不会白屏
+- 数据仍然只在你的服务器上，App 不存任何账目
+- 升级服务端不用重发 APK（接口保持兼容）；改了界面想同步到 App 里，重新发一版即可
+
+仓库里带了完整的 Android 工程（Capacitor 壳），`mobile/` 目录：
+
+- `mobile/www/index.html` —— 连接页（输入服务器地址，记住后自动进入）
+- `mobile/www/static/`、`mobile/www/ledger/` —— 由 `tools/build-mobile.js` 从 `app/static` 生成，已加入 `.gitignore`
+- `mobile/android/` —— 原生工程（应用名、图标、启动屏、返回键处理都已品牌化）
 - 应用 ID：`com.handzeros.familyledger`
 
 **构建方法 A：GitHub Actions（不需要本地装 Android 环境）**
@@ -229,28 +243,29 @@ proxy_set_header X-Forwarded-Proto $scheme;
 打 tag 会自动发 Release：
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 **构建方法 B：本地 Android Studio**
 
-用 Android Studio 打开 `mobile/android` 目录，等 Gradle 同步完成后：
+先打包 Web 端进 App 资源，再用 Android Studio 打开 `mobile/android`：
+
+```bash
+node tools/build-mobile.js      # 生成 mobile/www/static 与 mobile/www/ledger
+cd mobile && npx cap sync android
+```
+
 - 菜单 **Build → Build Bundle(s)/APK(s) → Build APK(s)**
 - 或命令行：`cd mobile/android && ./gradlew assembleDebug`
 - 产物：`mobile/android/app/build/outputs/apk/debug/app-debug.apk`
 
-改了连接页（`mobile/www`）后要同步一次：
-
-```bash
-cd mobile && npx cap sync android
-```
+> 改了 `app/static` 里的界面后，必须重新跑一次 `node tools/build-mobile.js && npx cap sync android`，
+> 否则 App 里还是旧界面。CI 每次构建都会自动执行这一步。
 
 **说明**
 
-- 这是「WebView 壳」型 App：界面仍从你的服务器加载，所以**升级服务端不用重新发版**，App 只负责提供图标入口和服务器地址
-- 首次打开输入服务器地址（如 `http://192.168.1.10:5257` 或 `https://ledger.你的域名`），地址会记住
-- 局域网地址是 HTTP，工程里已开启 `usesCleartextTraffic`，可以正常连接
+- 局域网地址是 HTTP，工程里已开启 `usesCleartextTraffic` 与混合内容，可以正常连；App 页面源是 `https://localhost`，接口跨域访问靠服务端已有的 CORS 放行
 - debug 包可直接安装使用；如果要上架应用商店，需要用正式 keystore 签名（`./gradlew assembleRelease`）
 
 ---
@@ -397,10 +412,11 @@ bash scripts/build-fpk.sh
 │   ├── Caddyfile
 │   └── nginx.conf                # 方案 C：已有 Nginx
 ├── mobile/                       # Android App（Capacitor）
-│   ├── www/index.html            # 连接页：输入服务器地址
+│   ├── www/index.html            # 连接页：填服务器地址，之后自动进入账本
+│   ├── www/static/、www/ledger/  # 构建时由 tools/build-mobile.js 生成（已忽略）
 │   ├── capacitor.config.json
 │   ├── package.json
-│   └── android/                  # 原生工程（图标/启动屏已品牌化）
+│   └── android/                  # 原生工程（图标/启动屏/返回键已品牌化）
 ├── fnos/family-ledger/           # 飞牛 FPK 打包工程
 │   ├── manifest                  # 应用信息（appname/版本/端口/依赖 python312）
 │   ├── cmd/                      # 生命周期脚本（启动/停止/安装/升级/卸载）
@@ -411,7 +427,9 @@ bash scripts/build-fpk.sh
 │   ├── build-fpk.sh              # 组装并打包 .fpk（Linux/macOS）
 │   ├── docker-smoke.py           # 镜像自检（初始化→登录→记账→统计）
 │   └── publish-github.sh         # 一键推送到 GitHub
-├── tools/gen-assets.js           # 重新生成图标（PWA / Android / 飞牛）
+├── tools/
+│   ├── gen-assets.js             # 重新生成图标（PWA / Android / 飞牛）
+│   └── build-mobile.js           # 把 Web 端打进 App 本地资源（App 内记账用）
 ├── .github/workflows/
 │   ├── android.yml               # 自动构建 APK
 │   ├── docker-publish.yml        # 自动构建并推送 Docker Hub / GHCR
@@ -517,11 +535,36 @@ git push
 
 > GitHub 已不支持用账号密码推送，必须用 PAT（<https://github.com/settings/tokens>）。经典 token 勾选 `repo`；如果还要推送 `.github/workflows/` 下的文件，需再勾 `workflow`。
 
-### 启用「自动构建 APK」
+### 三条自动构建流水线
 
-Actions 工作流没随仓库一起推送（推送它需要带 `workflow` 权限的 token），启用方式二选一：
+| 流水线 | 触发 | 产物 |
+| --- | --- | --- |
+| Build Android APK | 推送 `main` / 打 tag | `app-debug.apk`（打 tag 时自动发 Release） |
+| Publish Docker Image | 推送 `main` / 打 tag | Docker Hub `handzeros/family-ledger` + GHCR，amd64/arm64 |
+| Build fnOS FPK | 推送 `main` / 打 tag | `family-ledger.fpk` |
 
-1. **网页添加**：打开 <https://github.com/HandZeros/family-ledger/new/main?filename=.github/workflows/android.yml>，把 `docs/android-workflow.yml` 的内容整段粘进去，Commit 即可
-2. **换 token**：用带 `workflow` 权限的 token 执行 `git push`
+发一版新版：
 
-启用后：**Actions → Build Android APK → Run workflow**，跑完在 Artifacts 下载 `app-debug.apk`。
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+三条流水线会同时构建：镜像自动带上 `1.1.0` / `1.1` 标签，APK 与 FPK 自动挂到 Release 页。
+
+### 版本号写在哪
+
+- `app/main.py` → `FastAPI(version=...)`（`/api/status` 会返回）
+- `app/static/app.js` → 页脚「家庭账本 v1.1」
+- `fnos/family-ledger/manifest` → `version` 与 `changelog`
+- `mobile/package.json` → `version`
+- `mobile/android/app/build.gradle` → `versionCode`（每次 +1）、`versionName`
+
+### 更新日志
+
+**1.1.0**
+
+- 安卓 App 支持在 App 内直接记账，不再跳转系统浏览器：Web 端在构建时打包进 App 本地资源，接口仍指向你自己的服务器
+- App 记住服务器地址后，再次启动自动进入账本
+- 返回键改为先关闭记账面板、再回到明细页，最后才退到后台
+- App 内跳过 Service Worker 注册，避免本地页面被缓存干扰

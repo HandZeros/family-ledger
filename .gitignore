@@ -38,6 +38,10 @@ fnos/family-ledger/app/server/wheels/
 tools/bin/
 .fpktest/
 
+# Android 壳里打包的 Web 端（由 tools/build-mobile.js 生成）
+mobile/www/static/
+mobile/www/ledger/
+
 # 系统
 .DS_Store
 Thumbs.db

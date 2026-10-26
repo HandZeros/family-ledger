@@ -48,7 +48,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="家庭账本",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,

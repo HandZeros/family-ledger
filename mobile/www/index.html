@@ -57,47 +57,71 @@
   }
   button:active { transform: scale(.98); }
   button:disabled { opacity: .6; }
+  button.ghost {
+    background: var(--brand-soft); color: var(--brand); box-shadow: none;
+    height: 42px; font-size: 14px; font-weight: 600;
+  }
   .err {
     display: none; margin-top: 12px; font-size: 12.5px; line-height: 1.6;
     background: #fdecea; color: var(--danger); padding: 9px 12px; border-radius: 10px;
   }
   .err.on { display: block; }
   .tip { font-size: 11.5px; color: var(--muted); line-height: 1.7; margin-top: 16px; }
-  .recent { margin-top: 10px; }
-  .recent button {
-    height: 38px; margin-top: 8px; font-size: 13px; font-weight: 500;
-    background: var(--brand-soft); color: var(--brand); box-shadow: none;
+
+  /* 正在进入账本 */
+  .splash { display: none; text-align: center; padding: 18px 0 6px; }
+  .splash.on { display: block; }
+  .spinner {
+    width: 34px; height: 34px; margin: 0 auto 14px; border-radius: 50%;
+    border: 3px solid var(--brand-soft); border-top-color: var(--brand);
+    animation: spin .9s linear infinite;
   }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .splash p { font-size: 13px; color: var(--muted); margin: 0; }
+  .hide { display: none !important; }
 </style>
 </head>
 <body>
   <div class="card">
     <div class="logo"><img src="icon.png" alt="" /></div>
     <h1>家庭账本</h1>
-    <p class="desc">连接到你自己的账本服务器。<br/>地址由家庭管理员提供。</p>
 
-    <form id="f">
-      <label for="addr">服务器地址</label>
-      <input id="addr" type="text" inputmode="url" autocapitalize="none" autocorrect="off"
-             spellcheck="false" placeholder="http://192.168.1.10:5257" />
-      <button type="submit" id="btn">连接</button>
-    </form>
-    <div class="err" id="err"></div>
+    <div class="splash" id="splash">
+      <div class="spinner"></div>
+      <p id="splashText">正在进入账本…</p>
+    </div>
 
-    <p class="tip">
-      局域网：http://192.168.x.x:5257<br/>
-      外网：https://你的域名（需已配置反向代理）
-    </p>
+    <div id="formWrap">
+      <p class="desc">连接到你自己的账本服务器。<br/>地址由家庭管理员提供。</p>
+
+      <form id="f">
+        <label for="addr">服务器地址</label>
+        <input id="addr" type="text" inputmode="url" autocapitalize="none" autocorrect="off"
+               spellcheck="false" placeholder="http://192.168.1.10:5257" />
+        <button type="submit" id="btn">连接</button>
+      </form>
+      <div class="err" id="err"></div>
+
+      <p class="tip">
+        局域网：http://192.168.x.x:5257<br/>
+        外网：https://你的域名（需已配置反向代理）
+      </p>
+    </div>
   </div>
 
 <script>
 (function () {
-  var KEY = 'fl.server';
-  var input = document.getElementById('addr');
-  var btn = document.getElementById('btn');
-  var err = document.getElementById('err');
-  var last = localStorage.getItem(KEY) || '';
-  if (last) input.value = last;
+  var API_KEY = 'fl.api';        // 与 Web 端 app.js 约定的键，账本页直接读这个
+  var SERVER_KEY = 'fl.server';  // 兼容 1.0 版留下的键
+  var LEDGER = 'ledger/index.html';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $('addr');
+  var btn = $('btn');
+  var err = $('err');
+  var formWrap = $('formWrap');
+  var splash = $('splash');
+  var splashText = $('splashText');
 
   function normalize(v) {
     v = (v || '').trim();
@@ -105,41 +129,76 @@
     if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
     return v.replace(/\/+$/, '');
   }
-  function fail(msg) {
+
+  function errBox(msg) {
     err.textContent = msg;
     err.classList.add('on');
+  }
+  function clearErr() { err.classList.remove('on'); }
+
+  function reset() {
+    formWrap.classList.remove('hide');
+    splash.classList.remove('on');
     btn.disabled = false;
     btn.textContent = '连接';
   }
 
-  document.getElementById('f').addEventListener('submit', function (e) {
-    e.preventDefault();
-    err.classList.remove('on');
-    var url = normalize(input.value);
-    if (!url) { fail('请填写服务器地址'); return; }
+  function entering(url) {
+    formWrap.classList.add('hide');
+    splash.classList.add('on');
+    splashText.textContent = '正在打开账本…';
+    // 记住地址：账本页（app.js）启动时读 localStorage 的 fl.api 作为接口根地址
+    localStorage.setItem(API_KEY, url);
+    localStorage.setItem(SERVER_KEY, url);
+    setTimeout(function () { location.href = LEDGER; }, 60);
+  }
 
-    btn.disabled = true;
-    btn.textContent = '连接中…';
+  function probe(url, auto) {
+    if (!auto) {
+      btn.disabled = true;
+      btn.textContent = '连接中…';
+    }
+    formWrap.classList.remove('hide');
+    splash.classList.add('on');
+    splashText.textContent = auto ? '正在进入账本…' : '正在连接服务器…';
 
     var ctrl = new AbortController();
-    var timer = setTimeout(function () { ctrl.abort(); }, 7000);
+    var timer = setTimeout(function () { ctrl.abort(); }, auto ? 3500 : 7000);
 
     fetch(url + '/api/health', { cache: 'no-store', signal: ctrl.signal })
       .then(function (res) { return res.json(); })
       .then(function (data) {
         clearTimeout(timer);
         if (!data || data.status !== 'ok') throw new Error('bad');
-        localStorage.setItem(KEY, url);
-        btn.textContent = '正在打开…';
-        location.href = url + '/';
+        entering(url);
       })
       .catch(function () {
         clearTimeout(timer);
-        fail('连不上这台服务器。请检查地址是否正确、手机与服务器是否在同一网络，或服务是否已启动。');
+        reset();
+        input.value = url;
+        errBox(
+          auto
+            ? '连不上上次用的服务器（' + url + '）。请确认手机和服务器在同一网络，或把地址改对后重试。'
+            : '连不上这台服务器。请检查地址是否正确、手机与服务器是否在同一网络，或服务是否已启动。'
+        );
       });
+  }
+
+  $('f').addEventListener('submit', function (e) {
+    e.preventDefault();
+    clearErr();
+    var url = normalize(input.value);
+    if (!url) { errBox('请填写服务器地址'); return; }
+    probe(url, false);
   });
 
-  if (last) {
+  // 已有地址：直接尝试进入账本，省去每次手动点连接
+  var saved = normalize(localStorage.getItem(API_KEY) || localStorage.getItem(SERVER_KEY) || '');
+  if (saved) {
+    input.value = saved;
+    probe(saved, true);
+  } else {
+    reset();
     input.addEventListener('focus', function () { input.select(); }, { once: true });
   }
 })();
