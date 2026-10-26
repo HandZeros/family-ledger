@@ -9,18 +9,13 @@ name: Publish Docker Image
 
 on:
   workflow_dispatch:
+  # 注意：这里不加 paths 过滤。打了 v1.1.0 这类新 tag 时，tag 指向的提交
+  # 未必改过 app/ 目录，一旦加了 paths 过滤，发版构建会被静默跳过。
   push:
     branches:
       - main
     tags:
       - 'v*'
-    paths:
-      - 'app/**'
-      - 'Dockerfile'
-      - 'requirements.txt'
-      - '.dockerignore'
-      - 'scripts/docker-smoke.py'
-      - '.github/workflows/docker-publish.yml'
 
 permissions:
   contents: read
