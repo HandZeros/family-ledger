@@ -19,11 +19,11 @@
 | --- | --- | --- |
 | ![](screenshots/04-entry.png) | ![](screenshots/05-stats.png) | ![](screenshots/07-members.png) |
 
-分类是两级结构（参考随手记）：先选一级分类，再选二级分类。
+记账面板参考「随手记」重做（1.3）：大金额 + 分类/账户/时间/备注表单行，点分类弹出选择层。
 
-| 记账面板：一级分类横滑 + 二级网格 | 切换一级分类 | 账本页分类树 |
+| 记账面板（1.3） | 分类选择弹层 | 账本页分类树 |
 | --- | --- | --- |
-| ![](screenshots/13-cat-picker.png) | ![](screenshots/14-cat-picker-group.png) | ![](screenshots/15-cat-tree.png) |
+| ![](screenshots/18-tx-sheet-v13.png) | ![](screenshots/19-cat-picker-v13.png) | ![](screenshots/15-cat-tree.png) |
 
 桌面端（浏览器宽度 ≥ 1000px 时自动切换为侧边栏布局）：
 
@@ -69,7 +69,7 @@ docker run -d --name family-ledger --restart unless-stopped \
 | GHCR | `ghcr.io/handzeros/family-ledger:latest` | 备用源，内容与上面一致 |
 
 支持 `linux/amd64` 与 `linux/arm64`（x86 服务器、群晖、飞牛、树莓派均可直接跑）。
-可用标签：`latest`、`1.2.0`、`1.2`、`sha-xxxxxxx`（每次打 tag 发版会自动追加新版本号）。
+可用标签：`latest`、`1.3.0`、`1.3`、`sha-xxxxxxx`（每次打 tag 发版会自动追加新版本号）。
 
 ### 方式 B：从源码构建
 
@@ -249,8 +249,8 @@ proxy_set_header X-Forwarded-Proto $scheme;
 打 tag 会自动发 Release：
 
 ```bash
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
 **构建方法 B：本地 Android Studio**
@@ -378,7 +378,9 @@ bash scripts/build-fpk.sh
 
 - 首页右下角 `＋` 或「记支出 / 记收入」按钮打开记账面板
 - 内置数字键盘支持 `+` `-` 连续计算（如买菜 12.5 + 8.3）
-- 分类是两级结构：顶部横滑选一级分类（食品酒水 / 行车交通 …），下方网格选二级分类（早餐 / 打车 …），切换一级分类后第一个二级项会自动选中，少点一次
+- 记账面板参考「随手记」：上方大金额 + 下方「分类 / 账户 / 时间 / 备注」表单行，点分类行弹出选择层
+- 分类选择层按一级分类分组展示二级网格，顶部还有「最近使用」，常用分类一次直达
+- 键盘参考随手记：右侧长条「确定」，支持 `+` `-` 连续计算（如买菜 12.5 + 8.3）
 - 每笔可指定：分类、账户、日期、备注
 - 点任意一条流水即可修改或删除
 - 「转账」用于账户之间挪钱（如银行卡 → 微信），不计入收支
@@ -581,21 +583,32 @@ git push
 发一版新版：
 
 ```bash
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.3.0
+git push origin v1.3.0
 ```
 
-三条流水线会同时构建：镜像自动带上 `1.2.0` / `1.2` 标签，APK 与 FPK 自动挂到 Release 页。
+三条流水线会同时构建：镜像自动带上 `1.3.0` / `1.3` 标签，APK 与 FPK 自动挂到 Release 页。
 
 ### 版本号写在哪
 
 - `app/main.py` → `FastAPI(version=...)`（`/api/status` 会返回）
-- `app/static/app.js` → 页脚「家庭账本 v1.2」
+- `app/static/app.js` → 页脚「家庭账本 v1.3」
 - `fnos/family-ledger/manifest` → `version` 与 `changelog`
 - `mobile/package.json` → `version`
 - `mobile/android/app/build.gradle` → `versionCode`（每次 +1）、`versionName`
 
 ### 更新日志
+
+**1.3.0**
+
+- 记账面板参考「随手记」重做：大金额显示 + 「分类 / 账户 / 时间 / 备注」表单行布局
+- 分类选择改为弹层：顶部「最近使用」+ 按一级分类分组的 5 列网格，支持弹层内直接添加分类
+- 记账成功后自动记录最近使用的分类
+- 账户选择改为弹层列表（含余额展示）
+- 键盘改为随手记样式：右侧长条「确定」，底行 `.` `0` `⌫`
+- 类型切换（支出/收入/转账）改为顶部下划线式标签
+- 修复「我的」页退出登录图标被渲染成巨大图形的问题（SVG 缺少尺寸约束），并换成标准的门+箭头方向
+- 版本号统一升到 1.3
 
 **1.2.0**
 

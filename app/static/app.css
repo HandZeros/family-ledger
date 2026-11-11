@@ -477,42 +477,90 @@ select.input {
 }
 .icon-btn:active { background: var(--bg-deep); }
 
-/* 记账金额 */
-.amount-box {
-  display: flex; align-items: baseline; justify-content: flex-end; gap: 3px;
-  padding: 4px 4px 6px;
+/* 记账金额（参考随手记：大字金额 + 下划线） */
+.amount-line {
+  display: flex; align-items: baseline; gap: 4px;
+  padding: 10px 6px 8px; border-bottom: 1.5px solid currentColor;
 }
-.amount-box .cur { font-size: 16px; color: var(--muted); }
-.amount-box .val {
-  font-size: 36px; font-weight: 700; letter-spacing: -0.8px; line-height: 1.1;
-  min-height: 42px; font-variant-numeric: tabular-nums;
+.amount-line .cur { font-size: 18px; font-weight: 650; opacity: 0.85; }
+.amount-line .val {
+  font-size: 40px; font-weight: 700; letter-spacing: -1px; line-height: 1.1;
+  min-height: 46px; font-variant-numeric: tabular-nums;
 }
-.amount-box .val.ph { color: #c9c3b6; }
-.amount-sub { text-align: right; font-size: 11.5px; color: var(--muted); min-height: 16px; padding-right: 4px; }
+.amount-line .val.ph { opacity: 0.45; }
+.amount-line .sub { margin-left: auto; font-size: 12px; opacity: 0.75; align-self: flex-end; padding-bottom: 6px; }
+
+/* 记账表单行：图标 + 标签 + 值（点击弹选择层） */
+.tx-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 6px; position: relative; border-bottom: 1px solid var(--line);
+  width: 100%; text-align: left; background: none;
+}
+.tx-row:active { background: var(--surface-2); }
+.tx-row .ric {
+  width: 30px; height: 30px; border-radius: 10px; flex: none;
+  display: grid; place-items: center; background: var(--bg-deep); color: var(--text-2);
+}
+.tx-row .ric svg { width: 16px; height: 16px; }
+.tx-row .rlb { width: 58px; flex: none; font-size: 13.5px; color: var(--muted); }
+.tx-row .rval { flex: 1; font-size: 14.5px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-row .rval .ph2 { color: #c9c3b6; font-weight: 500; }
+.tx-row .rchev { color: var(--line-strong); font-size: 17px; flex: none; }
+.tx-row .date-input {
+  position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; border: 0;
+  -webkit-appearance: none; appearance: none;
+}
+.tx-row .note-input {
+  flex: 1; border: 0; outline: none; background: none; font-size: 14px;
+  color: var(--text); min-width: 0; padding: 0;
+}
+.tx-row .note-input::placeholder { color: #c9c3b6; }
 
 .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 
-/* 记账抽屉：一级分类横滑标签 + 二级分类网格 */
-.cat-tabs {
-  display: flex; gap: 7px; overflow-x: auto; padding: 2px 0 10px;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+/* 记账抽屉顶部的类型切换（参考随手记：文字 tab + 下划线圆点） */
+.kind-head { padding: 8px 16px 0; }
+.kind-tabs { display: flex; gap: 22px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.kind-tabs::-webkit-scrollbar { display: none; }
+.kt {
+  padding: 8px 2px 10px; font-size: 15px; font-weight: 600; color: var(--muted);
+  position: relative; flex: none; transition: color 0.15s;
 }
-.cat-tabs::-webkit-scrollbar { display: none; }
-.cat-tab {
-  display: inline-flex; align-items: center; gap: 5px; flex: none;
-  padding: 5px 11px 5px 5px; border-radius: 999px; font-size: 12.5px;
-  background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2); white-space: nowrap;
+.kt.on { color: var(--brand); }
+.kt.on::after {
+  content: ""; position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: 4px; width: 16px; height: 3px; border-radius: 3px; background: currentColor;
 }
-.cat-tab .gi {
-  width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 13px;
+
+/* 分类选择弹层（参考随手记：最近使用 + 一级分组小标题 + 多列网格） */
+.cat-picker { padding-bottom: 8px; }
+.cp-sec {
+  font-size: 12px; color: var(--muted); padding: 14px 4px 8px;
+  display: flex; align-items: center; gap: 5px;
 }
-.cat-tab.on {
-  background: var(--brand-soft); border-color: rgba(46, 107, 90, 0.28);
-  color: var(--brand); font-weight: 650;
+.cp-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px 2px; }
+.cp-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 8px 2px 7px; border-radius: 13px; border: 1px solid transparent;
+  transition: all 0.12s; min-width: 0;
 }
+.cp-cell .ci {
+  width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 19px; flex: none;
+}
+.cp-cell .cn {
+  font-size: 10.5px; color: var(--text-2); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cp-cell.on { background: var(--brand-soft); border-color: rgba(46, 107, 90, 0.22); }
+.cp-cell.on .cn { color: var(--brand); font-weight: 650; }
 
 /* 统计页：一级/二级切换 */
 .seg-mini button { padding: 5px 11px; font-size: 12px; }
+
+/* 图标尺寸兜底：svg 无显式宽高时默认会撑到 300×150（退出登录图标过大就是这个原因） */
+.icon-btn svg, .btn svg { width: 18px; height: 18px; flex: none; }
+.list-row .ico svg { width: 17px; height: 17px; }
 .cat-cell {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 5px 2px; border-radius: 12px; border: 1px solid transparent; transition: all 0.12s;
@@ -549,9 +597,8 @@ select.input {
 }
 .keypad button:active { transform: scale(0.96); background: #f0ede6; }
 .keypad button.op { background: #f0f4f1; color: var(--brand); font-size: 18px; }
-.keypad button.ok { background: var(--brand); color: #fff; font-size: 15px; font-weight: 650; }
+.keypad button.ok { background: var(--brand); color: #fff; font-size: 15px; font-weight: 650; grid-row: span 2; height: auto; }
 .keypad button.fn { font-size: 15px; color: var(--text-2); }
-.keypad .zero { grid-column: span 1; }
 
 /* 用户行 */
 .u-row { display: flex; align-items: center; gap: 11px; padding: 12px 14px; position: relative; }

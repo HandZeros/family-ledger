@@ -35,7 +35,7 @@
     trash: '<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
     edit: '<path d="M4 20h4l10-10-4-4L4 16z"/>',
     download: '<path d="M12 4v10m0 0l-4-4m4 4l4-4M4 18h16"/>',
-    logout: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 8l-4 4 4 4M6 12h9"/>',
+    logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
     lock: '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
     tag: '<path d="M4 12l8-8h7v7l-8 8z"/><circle cx="16" cy="8" r="1.2"/>',
     coins: '<ellipse cx="12" cy="6.5" rx="8" ry="3"/><path d="M4 6.5v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5"/><path d="M4 11.5v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5"/>',
@@ -743,7 +743,7 @@
     <div class="mt24">
       <button class="btn ghost block" data-act="logout" style="color:var(--expense)">${icon('logout')} 退出登录</button>
     </div>
-    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.2 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
+    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.3 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
   }
 
   // -------------------------------------------------- 成员管理
@@ -862,6 +862,31 @@
   }
 
   // -------------------------------------------------- 记账抽屉
+  const LS_RECENT_CATS = 'fl.recentCats';
+
+  function recentCatIds() {
+    try { return JSON.parse(localStorage.getItem(LS_RECENT_CATS) || '[]') || []; } catch (e) { return []; }
+  }
+
+  function pushRecentCat(id) {
+    if (!id) return;
+    try {
+      const ids = [id, ...recentCatIds().filter((x) => x !== id)].slice(0, 10);
+      localStorage.setItem(LS_RECENT_CATS, JSON.stringify(ids));
+    } catch (e) {}
+  }
+
+  function friendlyDate(dateStr) {
+    if (!dateStr) return '';
+    const today = todayStr();
+    const d = new Date(dateStr + 'T00:00:00');
+    const md = `${d.getMonth() + 1}月${d.getDate()}日`;
+    if (dateStr === today) return `今天 ${md}`;
+    const yest = new Date(); yest.setDate(yest.getDate() - 1);
+    if (dateStr === todayStr(yest)) return `昨天 ${md}`;
+    return `${d.getFullYear() === new Date().getFullYear() ? '' : d.getFullYear() + '年'}${md}`;
+  }
+
   function openTxSheet(editTx, kind) {
     const cats = state.data.categories || [];
     const accounts = state.data.accounts || [];
@@ -869,7 +894,7 @@
     const initGroups = catTree(initKind).filter((g) => g.children.length);
     const initCat = editTx && editTx.category ? catFind(editTx.category.id) : null;
     const firstGroup = initGroups[0];
-    const draft = {
+    window.__draft = {
       id: editTx ? editTx.id : null,
       kind: initKind,
       amountStr: editTx ? String(editTx.amount) : '',
@@ -881,96 +906,90 @@
       date: editTx ? editTx.date : todayStr(),
       note: editTx ? editTx.note : '',
     };
+    buildTxSheet();
+  }
 
-    // 预览态：金额输入的同时展示"
+  // 重建整个记账抽屉（分类/账户选择弹层返回时用它恢复界面）
+  function buildTxSheet() {
+    const d = window.__draft;
+    if (!d) return;
     openSheet(
-      `<div class="sheet-head">
-        <div class="seg" style="flex:0 0 auto">
-          ${can('record_expense') ? `<button data-act="tx-kind" data-kind="expense" class="${draft.kind === 'expense' ? 'on' : ''}">支出</button>` : ''}
-          ${can('record_income') ? `<button data-act="tx-kind" data-kind="income" class="${draft.kind === 'income' ? 'on' : ''}">收入</button>` : ''}
-          ${can('record_expense') ? `<button data-act="tx-kind" data-kind="transfer" class="${draft.kind === 'transfer' ? 'on' : ''}">转账</button>` : ''}
+      `<div class="sheet-head kind-head">
+        <div class="kind-tabs">
+          ${can('record_expense') ? `<button class="kt ${d.kind === 'expense' ? 'on' : ''}" data-act="tx-kind" data-kind="expense">支出</button>` : ''}
+          ${can('record_income') ? `<button class="kt ${d.kind === 'income' ? 'on' : ''}" data-act="tx-kind" data-kind="income">收入</button>` : ''}
+          ${can('record_expense') ? `<button class="kt ${d.kind === 'transfer' ? 'on' : ''}" data-act="tx-kind" data-kind="transfer">转账</button>` : ''}
         </div>
         <div class="grow"></div>
-        ${draft.id ? `<button class="icon-btn" data-act="del-tx" data-id="${draft.id}" style="color:var(--expense)">${icon('trash')}</button>` : ''}
+        ${d.id ? `<button class="icon-btn" data-act="del-tx" data-id="${d.id}" style="color:var(--expense)">${icon('trash')}</button>` : ''}
         <button class="icon-btn" data-act="close-sheet">${icon('close')}</button>
       </div>
       <div class="sheet-body" id="txBody"></div>
       <div class="keypad" id="keypad"></div>`,
-      () => {
-        window.__draft = draft;
-        renderTxBody();
-      }
+      () => renderTxBody()
     );
   }
 
   function renderTxBody() {
     const d = window.__draft;
     if (!d) return;
-    const groups = d.kind === 'transfer' ? [] : catTree(d.kind).filter((g) => g.children.length);
-    let activeGroup = null;
-    if (d.kind !== 'transfer') {
-      activeGroup = groups.find((g) => g.id === d.groupId) || groups[0] || null;
-      if (activeGroup) {
-        d.groupId = activeGroup.id;
-        // 选中的二级分类必须落在当前一级分类里
-        if (!activeGroup.children.some((c) => c.id === d.categoryId)) {
-          d.categoryId = activeGroup.children[0] ? activeGroup.children[0].id : null;
-        }
-      } else {
-        d.categoryId = null;
-      }
-    }
     const accounts = state.data.accounts || [];
+    const acc = accounts.find((a) => a.id === d.accountId) || null;
+    const accTo = accounts.find((a) => a.id === d.toAccountId) || null;
+    const cat = d.kind === 'transfer' ? null : catFind(d.categoryId);
+    const parent = cat && cat.parent_id ? catFind(cat.parent_id) : null;
     const disp = d.amountStr === '' ? '0.00' : d.amountStr;
-    const sub = d.base ? `${d.kind === 'expense' ? '合计' : '合计'} ¥${fmt(d.base + (parseFloat(d.amountStr) || 0))}` : '';
+    const kindColor = d.kind === 'income' ? 'var(--income)' : d.kind === 'expense' ? 'var(--expense)' : 'var(--brand)';
+    const total = (d.base || 0) + (parseFloat(d.amountStr) || 0);
+
+    const accLabel = (a, ph) => (a ? `${esc(a.icon)} ${esc(a.name)}` : `<span class="ph2">${ph}</span>`);
 
     const body = `
-      <div class="amount-box">
+      <div class="amount-line" style="color:${kindColor}">
         <span class="cur">¥</span>
         <span class="val num ${d.amountStr === '' ? 'ph' : ''}">${esc(disp)}</span>
+        <span class="sub num">${d.base ? '合计 ¥' + fmt(total) : ''}</span>
       </div>
-      <div class="amount-sub">${sub}</div>
 
       ${d.kind === 'transfer' ? `
-        <div class="field"><label>转出账户</label>
-          <div class="pill-row">${accounts.map((a) => `<button class="pill ${d.accountId === a.id ? 'on' : ''}" data-act="pick-acc" data-id="${a.id}">${esc(a.icon)} ${esc(a.name)}</button>`).join('')}</div>
+        <div class="tx-row" data-act="open-acc-picker" data-field="acc">
+          <div class="ric">${icon('wallet')}</div><div class="rlb">转出账户</div>
+          <div class="rval">${accLabel(acc, '请选择')}</div><div class="rchev">›</div>
         </div>
-        <div class="field"><label>转入账户</label>
-          <div class="pill-row">${accounts.map((a) => `<button class="pill ${d.toAccountId === a.id ? 'on' : ''}" data-act="pick-acc-to" data-id="${a.id}">${esc(a.icon)} ${esc(a.name)}</button>`).join('')}</div>
+        <div class="tx-row" data-act="open-acc-picker" data-field="to">
+          <div class="ric">${icon('download')}</div><div class="rlb">转入账户</div>
+          <div class="rval">${accLabel(accTo, '请选择')}</div><div class="rchev">›</div>
         </div>
       ` : `
-        <div class="cat-tabs">
-          ${groups.map((g) => `<button class="cat-tab ${d.groupId === g.id ? 'on' : ''}" data-act="pick-group" data-id="${g.id}">
-            <span class="gi" style="background:${tint(g.color)}">${esc(g.icon)}</span><span class="tn">${esc(g.name)}</span>
-          </button>`).join('')}
+        <div class="tx-row" data-act="open-cat-picker">
+          <div class="ric">${icon('tag')}</div><div class="rlb">分类</div>
+          <div class="rval">${cat ? `${parent ? esc(parent.name) + ' › ' : ''}${esc(cat.icon)} ${esc(cat.name)}` : '<span class="ph2">请选择分类</span>'}</div><div class="rchev">›</div>
         </div>
-        <div class="cat-grid">
-          ${(activeGroup ? activeGroup.children : []).map((c) => `<button class="cat-cell ${d.categoryId === c.id ? 'on' : ''}" data-act="pick-cat" data-id="${c.id}">
-            <div class="ico" style="background:${tint(c.color)}">${esc(c.icon)}</div><div class="nm">${esc(c.name)}</div>
-          </button>`).join('')}
-          ${!groups.length ? '<div class="hint" style="grid-column:1/-1;padding:14px 0;text-align:center">还没有分类，去「账本」里添加</div>' : ''}
-        </div>
-        <div class="field mt16"><label>账户</label>
-          <div class="pill-row">${accounts.map((a) => `<button class="pill ${d.accountId === a.id ? 'on' : ''}" data-act="pick-acc" data-id="${a.id}">${esc(a.icon)} ${esc(a.name)}</button>`).join('')}</div>
+        <div class="tx-row" data-act="open-acc-picker" data-field="acc">
+          <div class="ric">${icon('wallet')}</div><div class="rlb">账户</div>
+          <div class="rval">${accLabel(acc, '请选择')}</div><div class="rchev">›</div>
         </div>
       `}
 
-      <div class="field"><label>日期</label>
-        <input class="input" type="date" id="txDate" value="${d.date}" />
+      <div class="tx-row date-row">
+        <div class="ric">${icon('target')}</div><div class="rlb">时间</div>
+        <div class="rval">${friendlyDate(d.date)}</div>
+        <input class="date-input" type="date" id="txDate" value="${d.date}" aria-label="选择日期" />
       </div>
-      <div class="field" style="margin-bottom:0"><label>备注</label>
-        <input class="input" id="txNote" maxlength="40" placeholder="写点什么…（选填）" value="${esc(d.note)}" />
+      <div class="tx-row note-row">
+        <div class="ric">${icon('edit')}</div><div class="rlb">备注</div>
+        <input class="note-input" id="txNote" maxlength="40" placeholder="写点什么…（选填）" value="${esc(d.note)}" />
       </div>`;
 
+    // 键盘参考随手记：右侧一列 − / + / 长条「确定」，底行 . 0 ⌫
     const kb = [
-      ['1', '2', '3', ['del', '⌫', 'fn']],
-      ['4', '5', '6', ['+', '+', 'op']],
-      ['7', '8', '9', ['-', '−', 'op']],
-      [['.', '.', 'fn'], '0', '00', ['ok', '完成', 'ok']],
+      '7', '8', '9', ['-', '−', 'op'],
+      '4', '5', '6', ['+', '+', 'op'],
+      '1', '2', '3', ['ok', '确定', 'ok'],
+      ['.', '.', 'fn'], '0', ['del', '⌫', 'fn'],
     ];
 
     const keypadHtml = kb
-      .flat()
       .map((k) => {
         if (Array.isArray(k)) {
           const [key, label, cls] = k;
@@ -985,16 +1004,71 @@
     if (bodyEl) bodyEl.innerHTML = body;
     if (kpEl) kpEl.innerHTML = keypadHtml;
 
-    // 一级分类较多，切换后把当前分组滚进可视区，避免高亮项藏在屏幕外
-    const onTab = bodyEl && bodyEl.querySelector('.cat-tab.on');
-    if (onTab && onTab.scrollIntoView) {
-      onTab.scrollIntoView({ inline: 'center', block: 'nearest' });
-    }
-
     const dateEl = $('#txDate');
-    if (dateEl) dateEl.addEventListener('change', (e) => { window.__draft.date = e.target.value; });
+    if (dateEl) dateEl.addEventListener('change', (e) => { window.__draft.date = e.target.value; renderTxBody(); });
     const noteEl = $('#txNote');
     if (noteEl) noteEl.addEventListener('input', (e) => { window.__draft.note = e.target.value; });
+  }
+
+  // -------------------------------------------------- 分类选择弹层（参考随手记：最近使用 + 按一级分组）
+  function cpCell(c, on) {
+    return `<button class="cp-cell ${on ? 'on' : ''}" data-act="pick-cat" data-id="${c.id}">
+      <span class="ci" style="background:${tint(c.color)}">${esc(c.icon)}</span><span class="cn">${esc(c.name)}</span>
+    </button>`;
+  }
+
+  function openCatPicker() {
+    const d = window.__draft;
+    if (!d || d.kind === 'transfer') return;
+    const groups = catTree(d.kind).filter((g) => g.children.length);
+    const recents = recentCatIds().map(catFind).filter((c) => c && c.kind === d.kind);
+    openSheet(
+      `<div class="sheet-head">
+        <h3>选择${d.kind === 'expense' ? '支出' : '收入'}分类</h3><div class="grow"></div>
+        ${can('manage_categories') ? `<button class="btn soft sm" data-act="new-category" data-kind="${d.kind}">${icon('plus')} 添加分类</button>` : ''}
+        <button class="icon-btn" data-act="close-sheet">${icon('close')}</button>
+      </div>
+      <div class="sheet-body cat-picker">
+        ${recents.length ? `<div class="cp-sec">最近使用</div>
+        <div class="cp-grid">${recents.map((c) => cpCell(c, d.categoryId === c.id)).join('')}</div>` : ''}
+        ${groups
+          .map(
+            (g) => `<div class="cp-sec">${esc(g.icon)} ${esc(g.name)}</div>
+        <div class="cp-grid">${g.children.map((c) => cpCell(c, d.categoryId === c.id)).join('')}</div>`
+          )
+          .join('')}
+        ${!groups.length ? '<div class="hint" style="padding:20px 0;text-align:center">还没有分类，先去「账本」里添加</div>' : ''}
+      </div>`
+    );
+    const bodyEl = $('.cat-picker');
+    if (bodyEl) {
+      const on = bodyEl.querySelector('.cp-cell.on');
+      if (on && on.scrollIntoView) on.scrollIntoView({ block: 'center' });
+    }
+  }
+
+  // -------------------------------------------------- 账户选择弹层
+  function openAccPicker(field) {
+    const d = window.__draft;
+    if (!d) return;
+    const accounts = state.data.accounts || [];
+    const current = field === 'to' ? d.toAccountId : d.accountId;
+    openSheet(
+      `${sheetHead(field === 'to' ? '选择转入账户' : '选择账户')}
+      <div class="sheet-body">
+        <div class="list">
+          ${accounts
+            .map(
+              (a) => `<button class="list-row" data-act="pick-acc-row" data-field="${field}" data-id="${a.id}">
+            <div class="ico" style="font-size:17px;background:${tint('#4A7DBB')}">${esc(a.icon)}</div>
+            <div class="lb">${esc(a.name)}<span class="rt2">余额 ¥${fmt(a.balance)}</span></div>
+            ${current === a.id ? '<div class="pc" style="color:var(--brand)">✓</div>' : ''}
+          </button>`
+            )
+            .join('')}
+        </div>
+      </div>`
+    );
   }
 
   function pressKey(key) {
@@ -1029,11 +1103,11 @@
 
   function updateAmountDisplay() {
     const d = window.__draft;
-    const box = $('.amount-box .val');
+    const box = $('.amount-line .val');
     if (!box || !d) return;
     box.textContent = d.amountStr === '' ? '0.00' : d.amountStr;
     box.classList.toggle('ph', d.amountStr === '');
-    const sub = $('.amount-sub');
+    const sub = $('.amount-line .sub');
     if (sub) {
       const total = (d.base || 0) + (parseFloat(d.amountStr) || 0);
       sub.textContent = d.base ? `合计 ¥${fmt(total)}` : '';
@@ -1059,6 +1133,7 @@
     try {
       if (d.id) await request('/api/transactions/' + d.id, { method: 'PUT', body: payload });
       else await request('/api/transactions', { method: 'POST', body: payload });
+      if (d.kind !== 'transfer') pushRecentCat(d.categoryId);
       closeSheet();
       toast(d.id ? '已保存修改' : '记账成功', 'ok');
       state.data.stats = null;
@@ -1451,7 +1526,9 @@
           render();
           break;
         }
-        case 'tx-kind':
+        case 'tx-kind': {
+          const v = window.__draft;
+          if (!v) break;
           v.kind = el.dataset.kind;
           v.amountStr = v.amountStr;
           v.base = 0;
@@ -1462,33 +1539,38 @@
             const keep = g && g.children.some((c) => c.id === v.categoryId);
             v.categoryId = keep ? v.categoryId : g && g.children[0] ? g.children[0].id : null;
           }
-          renderTxBody();
-          break;
-        case 'pick-group': {
-          const gid = Number(el.dataset.id);
-          const g = catTree(v.kind).find((x) => x.id === gid);
-          v.groupId = gid;
-          if (g && g.children.length && !g.children.some((c) => c.id === v.categoryId)) {
-            v.categoryId = g.children[0].id;
-          }
-          renderTxBody();
+          buildTxSheet();
           break;
         }
+        case 'open-cat-picker':
+          openCatPicker();
+          break;
+        case 'open-acc-picker':
+          openAccPicker(el.dataset.field || 'acc');
+          break;
         case 'pick-cat': {
+          // 分类选择弹层里点选 → 关掉弹层并带着已填的内容回到记账面板
+          const d = window.__draft;
+          if (!d) break;
           const cat = catFind(Number(el.dataset.id));
-          v.categoryId = Number(el.dataset.id);
-          if (cat && cat.parent_id) v.groupId = cat.parent_id;
-          renderTxBody();
+          d.categoryId = cat ? cat.id : null;
+          if (cat && cat.parent_id) d.groupId = cat.parent_id;
+          closeSheet();
+          window.__draft = d;
+          buildTxSheet();
           break;
         }
-        case 'pick-acc':
-          v.accountId = Number(el.dataset.id);
-          renderTxBody();
+        case 'pick-acc-row': {
+          const d = window.__draft;
+          if (!d) break;
+          const id = Number(el.dataset.id);
+          if (el.dataset.field === 'to') d.toAccountId = id;
+          else d.accountId = id;
+          closeSheet();
+          window.__draft = d;
+          buildTxSheet();
           break;
-        case 'pick-acc-to':
-          v.toAccountId = Number(el.dataset.id);
-          renderTxBody();
-          break;
+        }
         case 'key':
           pressKey(el.dataset.key);
           break;
