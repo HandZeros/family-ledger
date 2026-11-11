@@ -69,7 +69,7 @@ docker run -d --name family-ledger --restart unless-stopped \
 | GHCR | `ghcr.io/handzeros/family-ledger:latest` | 备用源，内容与上面一致 |
 
 支持 `linux/amd64` 与 `linux/arm64`（x86 服务器、群晖、飞牛、树莓派均可直接跑）。
-可用标签：`latest`、`1.3.0`、`1.3`、`sha-xxxxxxx`（每次打 tag 发版会自动追加新版本号）。
+可用标签：`latest`、`1.3.1`、`1.3`、`sha-xxxxxxx`（每次打 tag 发版会自动追加新版本号）。
 
 ### 方式 B：从源码构建
 
@@ -592,12 +592,18 @@ git push origin v1.3.0
 ### 版本号写在哪
 
 - `app/main.py` → `FastAPI(version=...)`（`/api/status` 会返回）
-- `app/static/app.js` → 页脚「家庭账本 v1.3」
+- `app/static/app.js` → 页脚「家庭账本 v1.3.1」
 - `fnos/family-ledger/manifest` → `version` 与 `changelog`
 - `mobile/package.json` → `version`
 - `mobile/android/app/build.gradle` → `versionCode`（每次 +1）、`versionName`
 
 ### 更新日志
+
+**1.3.1**
+
+- 修复发版后浏览器仍显示旧界面的问题：Service Worker 从「缓存优先」改为「网络优先」（断网才回退缓存），缓存版本升到 fl-v2 并自动清理旧缓存
+- 静态资源改为协商缓存（Cache-Control: no-cache + ETag）：有更新立即下发，无更新返回 304
+- 老用户第一次打开会先看到旧界面，再刷新一次即可进入新版（SW 更新有时序）
 
 **1.3.0**
 

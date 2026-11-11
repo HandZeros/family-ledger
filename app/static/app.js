@@ -743,7 +743,7 @@
     <div class="mt24">
       <button class="btn ghost block" data-act="logout" style="color:var(--expense)">${icon('logout')} 退出登录</button>
     </div>
-    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.3 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
+    <p class="hint" style="text-align:center;margin-top:14px">家庭账本 v1.3.1 · 数据存放于你的服务器<br/>${esc(state.apiBase)}</p>`;
   }
 
   // -------------------------------------------------- 成员管理

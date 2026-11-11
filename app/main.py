@@ -48,7 +48,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="家庭账本",
-    version="1.3.0",
+    version="1.3.1",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
@@ -1110,4 +1110,17 @@ def service_worker():
     return FileResponse(STATIC_DIR / "sw.js", media_type="application/javascript", headers={"Cache-Control": "no-cache"})
 
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+class NoCacheStaticFiles(StaticFiles):
+    """静态资源协商缓存：每次都带 ETag 校验，文件有更新立即下发新版，没更新返回 304。
+
+    之前默认的启发式缓存会让浏览器把旧版 app.js/app.css 长期留在本地，
+    发版后部分设备不刷新；no-cache 保证「每次都问一下服务器」。
+    """
+
+    def file_response(self, *args, **kwargs) -> Response:
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
